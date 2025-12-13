@@ -42,6 +42,13 @@
     "date": "2025-12-13 16:21"
   },
   {
+    "player_name": "вап",
+    "score": 50,
+    "time_seconds": 63,
+    "time_formatted": "1:03",
+    "date": "2025-12-13 17:37"
+  },
+  {
     "player_name": "в",
     "score": 50,
     "time_seconds": 66,
@@ -61,12 +68,5 @@
     "time_seconds": 83,
     "time_formatted": "1:23",
     "date": "2025-12-13 16:05"
-  },
-  {
-    "player_name": "f",
-    "score": 45,
-    "time_seconds": 43,
-    "time_formatted": "0:43",
-    "date": "2025-12-13 17:16"
   }
 ]
