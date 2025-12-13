@@ -115,7 +115,14 @@ handlers: list[logging.Handler] = [file_handler]
 if enable_console_logging:
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.INFO)  # DEBUG логи не показываются в консоли
+    # Упрощенный формат для консоли (без имени модуля)
+    console_formatter = logging.Formatter('%(asctime)s %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+    console_handler.setFormatter(console_formatter)
     handlers.append(console_handler)
+
+# Форматтер для файла (с именем модуля, стандартный формат с миллисекундами)
+file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(file_formatter)
 
 # Настраиваем логирование
 logging.basicConfig(
@@ -1887,7 +1894,8 @@ def main() -> None:
                         )
                         
                         if ball_hits_paddle_side:
-                            logger.info(
+                            # Подробности в DEBUG лог (только в файл)
+                            logger.debug(
                                 f"[PADDLE COLLISION] ✅ БОКОВОЕ СТОЛКНОВЕНИЕ ОБНАРУЖЕНО! Сторона: {side_hit} "
                                 f"ball.centerx={ball.rect.centerx}, paddle.left={paddle.rect.left}, "
                                 f"paddle.right={paddle.rect.right}, "
@@ -1897,6 +1905,8 @@ def main() -> None:
                                 f"top={paddle.rect.top}, bottom={paddle.rect.bottom}, width={paddle.rect.width}), "
                                 f"vel=({ball.vel_x}, {ball.vel_y})"
                             )
+                            # Краткое сообщение в INFO лог (в консоль и файл)
+                            logger.info("[PADDLE COLLISION] ✅ БОКОВОЕ СТОЛКНОВЕНИЕ ОБНАРУЖЕНО!")
                     except Exception as e:
                         logger.error(f"[ERROR] Ошибка в вычислении ball_hits_paddle_side: {e}", exc_info=True)
                         raise
@@ -1904,7 +1914,8 @@ def main() -> None:
                     if ball_hits_paddle_side:
                         # УЛУЧШЕННАЯ ОБРАБОТКА БОКОВОГО СТОЛКНОВЕНИЯ - ЕСТЕСТВЕННЫЙ ОТСКОК
                         # Мяч отскакивает от боковой стороны платформы естественным образом
-                        logger.info(
+                        # Подробности в DEBUG лог (только в файл)
+                        logger.debug(
                             f"[PADDLE COLLISION] ✅ ОБРАБОТКА БОКОВОГО ОТСКОКА! Сторона: {side_hit} "
                             f"КООРДИНАТЫ СТОЛКНОВЕНИЯ: "
                             f"ball=({ball.rect.x}, {ball.rect.y}, centerx={ball.rect.centerx}, centery={ball.rect.centery}, "
@@ -1913,6 +1924,8 @@ def main() -> None:
                             f"top={paddle.rect.top}, bottom={paddle.rect.bottom}, width={paddle.rect.width}), "
                             f"vel_before=({ball.vel_x}, {ball.vel_y})"
                         )
+                        # Краткое сообщение в INFO лог (в консоль и файл)
+                        logger.info("[PADDLE COLLISION] ✅ ОБРАБОТКА БОКОВОГО ОТСКОКА!")
                         
                         # Вычисляем угол отскока в зависимости от того, насколько близко мяч к краю
                         # Чем ближе к краю, тем более горизонтальным будет отскок
@@ -2190,8 +2203,8 @@ def main() -> None:
                     
                     if ball_is_lost:
                         # Мяч ниже верхней границы платформы и не отскочил - он потерян
-                        # ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ: Координаты в момент потери мяча
-                        logger.error(
+                        # ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ: Координаты в момент потери мяча (только в файл)
+                        logger.debug(
                             f"[BALL LOST - BELOW PADDLE] ⚠️ МЯЧ ПОТЕРЯН - НИЖЕ ПЛАТФОРМЫ! "
                             f"КООРДИНАТЫ ПАДЕНИЯ: "
                             f"ball=({ball.rect.x}, {ball.rect.y}, centerx={ball.rect.centerx}, centery={ball.rect.centery}, "
@@ -2206,6 +2219,8 @@ def main() -> None:
                             f"ball_hits_paddle_top={ball_hits_paddle_top}, "
                             f"ball_hits_paddle_side={ball_hits_paddle_side if 'ball_hits_paddle_side' in locals() else 'N/A'}"
                         )
+                        # Краткое сообщение в ERROR лог (в консоль и файл)
+                        logger.error("[BALL LOST - BELOW PADDLE] ⚠️ МЯЧ ПОТЕРЯН - НИЖЕ ПЛАТФОРМЫ!")
                         
                         # Сохраняем траекторию падения мяча перед сбросом
                         saved_trajectory = calculate_ball_trajectory(ball, paddle)
