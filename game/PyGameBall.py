@@ -438,6 +438,14 @@ def get_player_name(
             (SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT // 2 + 80),
         )
 
+        # Подсказка о траектории
+        render_colored_hint(
+            screen,
+            font,
+            "Нажмите 5 для отображения траектории мяча",
+            (SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT // 2 + 110),
+        )
+
         pygame.display.flip()
 
     # ФИНАЛЬНАЯ ВАЛИДАЦИЯ: убеждаемся, что имя корректно
@@ -1255,7 +1263,7 @@ def render_colored_hint(
     """Отображает подсказку с выделенными ключевыми словами цветом"""
     words = text.split()
     x, y = pos
-    key_words = ["Enter", "H", "M", "ESC", "↑", "↓"]
+    key_words = ["Enter", "H", "M", "ESC", "↑", "↓", "5"]
 
     for word in words:
         # Убираем знаки препинания для сравнения
