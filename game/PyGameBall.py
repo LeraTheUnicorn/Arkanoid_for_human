@@ -1997,7 +1997,7 @@ def main() -> None:
                     
                     if ball_hits_paddle_top:
                         # ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ: Успешный отскок от верхней поверхности
-                        logger.info(
+                        logger.debug(
                             f"[PADDLE COLLISION] ✅ ОТСКОК ОТ ВЕРХНЕЙ ПОВЕРХНОСТИ! "
                             f"КООРДИНАТЫ СТОЛКНОВЕНИЯ: "
                             f"ball=({ball.rect.x}, {ball.rect.y}, centerx={ball.rect.centerx}, centery={ball.rect.centery}, "
