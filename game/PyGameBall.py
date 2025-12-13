@@ -1721,22 +1721,44 @@ def main() -> None:
                             if collides:
                                 logger.debug("[PADDLE COLLISION] Мяч только что отскочил, пропускаем обработку")
                         else:
-                            # Упрощенная логика: если мяч касается платформы, движется вниз, 
-                            # и центр мяча по горизонтали в пределах платформы - это отскок от верха
+                            # УЛУЧШЕННАЯ логика: проверяем верхнюю поверхность даже когда мяч не пересекается,
+                            # но находится очень близко к платформе (в пределах радиуса мяча)
+                            # Это исправляет проблему, когда мяч находится на 1-2 пикселя ниже платформы,
+                            # но его центр все еще в пределах платформы по горизонтали
+                            ball_radius = BALL_SIZE // 2
+                            
+                            # Мяч близко к платформе по вертикали (в пределах радиуса мяча)
+                            ball_near_paddle_vertically = (
+                                ball.rect.bottom >= paddle.rect.top - ball_radius  # Мяч близко к верхней части платформы
+                                and ball.rect.top <= paddle.rect.bottom + ball_radius  # Или может быть немного ниже
+                            )
+                            
+                            # Центр мяча в пределах платформы по горизонтали
+                            ball_center_in_paddle_horizontally = (
+                                paddle.rect.left <= ball.rect.centerx <= paddle.rect.right
+                            )
+                            
+                            # Проверяем, пересекается ли мяч с платформой
+                            ball_collides_with_paddle = ball.rect.colliderect(paddle.rect)
+                            
+                            # Верхняя поверхность: мяч движется вниз, центр в пределах платформы,
+                            # и мяч либо пересекается с платформой, либо очень близко к ней
                             ball_hits_paddle_top = (
-                                ball.rect.colliderect(paddle.rect) 
-                                and ball.vel_y > 0  # Мяч движется вниз
-                                and paddle.rect.left <= ball.rect.centerx <= paddle.rect.right  # Центр мяча в пределах платформы
+                                ball.vel_y > 0  # Мяч движется вниз
+                                and ball_center_in_paddle_horizontally  # Центр мяча в пределах платформы
+                                and (ball_collides_with_paddle or ball_near_paddle_vertically)  # Мяч пересекается или близко
                             )
                             
                             # ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ: Проверка верхней поверхности
                             logger.debug(
                                 f"[TOP SURFACE CHECK] Проверка верхней поверхности: "
-                                f"colliderect={ball.rect.colliderect(paddle.rect)}, vel_y={ball.vel_y}, "
+                                f"colliderect={ball_collides_with_paddle}, vel_y={ball.vel_y}, "
                                 f"ball.centerx={ball.rect.centerx}, paddle.left={paddle.rect.left}, "
                                 f"paddle.right={paddle.rect.right}, "
-                                f"condition_left={paddle.rect.left <= ball.rect.centerx}, "
-                                f"condition_right={ball.rect.centerx <= paddle.rect.right}, "
+                                f"ball_center_in_paddle_horizontally={ball_center_in_paddle_horizontally}, "
+                                f"ball_near_paddle_vertically={ball_near_paddle_vertically}, "
+                                f"ball.bottom={ball.rect.bottom}, paddle.top={paddle.rect.top}, "
+                                f"distance_to_paddle_top={ball.rect.bottom - paddle.rect.top}, "
                                 f"ball_hits_paddle_top={ball_hits_paddle_top}"
                             )
                             
@@ -2105,7 +2127,23 @@ def main() -> None:
 
                     # КРИТИЧНО: Проверяем потерю мяча ПОСЛЕ проверки столкновения с платформой
                     # Если мяч ниже верхней границы платформы И не было столкновения - он потерян
-                    if ball.rect.bottom > paddle.rect.top and not ball_hits_paddle_top:
+                    # НО: не считаем мяч потерянным, если он очень близко к платформе и его центр в пределах платформы
+                    # (это может быть случай, когда мяч находится на 1-2 пикселя ниже, но должен отскочить)
+                    ball_radius = BALL_SIZE // 2
+                    ball_far_below_paddle = ball.rect.bottom > paddle.rect.top + ball_radius  # Мяч значительно ниже платформы
+                    ball_center_outside_paddle = not (paddle.rect.left <= ball.rect.centerx <= paddle.rect.right)  # Центр вне платформы
+                    
+                    # Мяч потерян только если:
+                    # 1. Он значительно ниже платформы (больше чем радиус мяча)
+                    # 2. ИЛИ его центр вне платформы (промахнулся мимо)
+                    # 3. И не было столкновения с верхней поверхностью
+                    ball_is_lost = (
+                        ball.rect.bottom > paddle.rect.top  # Мяч ниже платформы
+                        and not ball_hits_paddle_top  # Не было столкновения с верхней поверхностью
+                        and (ball_far_below_paddle or ball_center_outside_paddle)  # Значительно ниже ИЛИ центр вне платформы
+                    )
+                    
+                    if ball_is_lost:
                         # Мяч ниже верхней границы платформы и не отскочил - он потерян
                         # ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ: Координаты в момент потери мяча
                         logger.error(
@@ -2118,6 +2156,8 @@ def main() -> None:
                             f"vel=({ball.vel_x}, {ball.vel_y}), "
                             f"ball.bottom={ball.rect.bottom}, paddle.top={paddle.rect.top}, "
                             f"distance_below_paddle={ball.rect.bottom - paddle.rect.top}, "
+                            f"ball_far_below_paddle={ball_far_below_paddle}, "
+                            f"ball_center_outside_paddle={ball_center_outside_paddle}, "
                             f"ball_hits_paddle_top={ball_hits_paddle_top}, "
                             f"ball_hits_paddle_side={ball_hits_paddle_side if 'ball_hits_paddle_side' in locals() else 'N/A'}"
                         )
