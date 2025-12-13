@@ -15,11 +15,18 @@ scripts_dir = os.path.dirname(os.path.abspath(__file__))
 
 
 def get_current_version():
-    """Получает текущую версию из version.py"""
+    """Получает текущую версию из version.py и обновляет её во всех файлах"""
     try:
         sys.path.insert(0, project_root)
-        from src.game.version import get_version_string
-
+        from game.version import get_version_string, update_version_in_all_files
+        
+        # Обновляем версию во всех файлах проекта
+        print("Обновляю версию проекта...")
+        if update_version_in_all_files():
+            print("✅ Версия обновлена во всех файлах")
+        else:
+            print("⚠️  Не удалось обновить версию во всех файлах")
+        
         return get_version_string()
     except Exception as e:
         print(f"Ошибка чтения версии из version.py: {e}")

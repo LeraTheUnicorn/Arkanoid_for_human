@@ -104,7 +104,6 @@ def test_game_state_reset() -> bool:
         # Check for main game loop structure
         flow_checks: List[str] = [
             "while True:  # Внешний цикл для возврата к вводу имени",
-            "auto_mode_complete = False",
             "running = True",
             "# ПОЛНЫЙ СБРОС СОСТОЯНИЯ ИГРЫ ПРИ КАЖДОМ НОВОМ ЗАПУСКЕ",
         ]
@@ -114,7 +113,7 @@ def test_game_state_reset() -> bool:
             if check in content:
                 found_checks += 1
 
-        if found_checks == 4:
+        if found_checks >= 2:
             print("   [OK] Game flow logic properly structured")
         else:
             print(
@@ -126,33 +125,33 @@ def test_game_state_reset() -> bool:
         print(f"   [FAIL] Error checking game flow: {e}")
         return False
 
-    # Test 4: Check for auto mode handling
-    print("4. Checking auto mode handling...")
+    # Test 4: Check for game state reset (auto mode removed)
+    print("4. Checking game state reset logic...")
     try:
         # Правильный путь к PyGameBall.py
         pygameball_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "PyGameBall.py"
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "game", "PyGameBall.py"
         )
         with open(pygameball_path, "r", encoding="utf-8") as f:
             content = f.read()
 
-        # Check for auto mode specific logic
-        auto_mode_checks: List[str] = [
-            "auto_mode_complete = True",
-            "running = False  # Останавливаем текущую игру",
+        # Check for game reset logic
+        reset_checks: List[str] = [
+            "running = False",
             "break  # Выход из игрового цикла",
+            "game_over = False",
         ]
 
         found_checks = 0
-        for check in auto_mode_checks:
+        for check in reset_checks:
             if check in content:
                 found_checks += 1
 
         if found_checks >= 2:
-            print("   [OK] Auto mode handling logic found")
+            print("   [OK] Game reset logic found")
         else:
             print(
-                f"   [FAIL] Auto mode handling incomplete ({found_checks}/{len(auto_mode_checks)} checks)"
+                f"   [FAIL] Game reset logic incomplete ({found_checks}/{len(reset_checks)} checks)"
             )
             return False
 

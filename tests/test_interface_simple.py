@@ -11,7 +11,7 @@ from typing import List, Dict, Any, Optional
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, parent_dir)
 
-from src.game.highscores import HighScoreManager
+from game.highscores import HighScoreManager
 import json
 
 
@@ -102,10 +102,10 @@ def test_highscores_logic() -> bool:
 
     try:
         # Создаем менеджер с тестовыми данными
-        from src.game.highscores import HIGHSCORES_FILE
+        from game.highscores import HIGHSCORES_FILE
 
         original_file: Optional[str] = HIGHSCORES_FILE
-        import highscores
+        import game.highscores as highscores
 
         highscores.HIGHSCORES_FILE = test_file
 
@@ -188,7 +188,7 @@ def test_highscores_logic() -> bool:
     finally:
         # Восстанавливаем оригинальный файл
         if original_file is not None:
-            import highscores
+            import game.highscores as highscores
 
             highscores.HIGHSCORES_FILE = original_file
 
@@ -207,10 +207,10 @@ def test_strict_10_limit() -> bool:
 
     try:
         # Создаем менеджер с чистым состоянием
-        from src.game.highscores import HIGHSCORES_FILE
+        from game.highscores import HIGHSCORES_FILE
 
         original_file: Optional[str] = HIGHSCORES_FILE
-        import highscores
+        import game.highscores as highscores
 
         highscores.HIGHSCORES_FILE = test_file
 
@@ -255,7 +255,7 @@ def test_strict_10_limit() -> bool:
     finally:
         # Восстанавливаем оригинальный файл
         if original_file is not None:
-            import highscores
+            import game.highscores as highscores
 
             highscores.HIGHSCORES_FILE = original_file
 

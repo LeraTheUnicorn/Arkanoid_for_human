@@ -11,7 +11,7 @@ from typing import List, Dict, Any, Optional
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, parent_dir)
 
-from src.game.highscores import HighScoreManager
+from game.highscores import HighScoreManager
 import json
 
 
@@ -101,10 +101,10 @@ def test_highscores_display_logic() -> bool:
 
     try:
         # Создаем менеджер с тестовыми данными
-        from src.game.highscores import HIGHSCORES_FILE
+        from game.highscores import HIGHSCORES_FILE
 
         original_file: Optional[str] = HIGHSCORES_FILE
-        import highscores
+        import game.highscores as highscores
 
         highscores.HIGHSCORES_FILE = "test_highscores.json"
 
@@ -196,7 +196,7 @@ def test_highscores_display_logic() -> bool:
     finally:
         # Восстанавливаем оригинальный файл
         if original_file is not None:
-            import highscores
+            import game.highscores as highscores
 
             highscores.HIGHSCORES_FILE = original_file
 
@@ -211,10 +211,10 @@ def test_score_limits() -> bool:
     print("ТЕСТ ОГРАНИЧЕНИЙ НА 10 ЗАПИСЕЙ")
     print("=" * 60)
 
-    from highscores import HIGHSCORES_FILE
+    from game.highscores import HIGHSCORES_FILE
 
     original_file: Optional[str] = HIGHSCORES_FILE
-    import highscores
+    import game.highscores as highscores
 
     highscores.HIGHSCORES_FILE = "test_limits.json"
 
@@ -259,7 +259,7 @@ def test_score_limits() -> bool:
 
     finally:
         if original_file is not None:
-            import highscores
+            import game.highscores as highscores
 
             highscores.HIGHSCORES_FILE = original_file
         if os.path.exists("test_limits.json"):
@@ -301,7 +301,7 @@ def test_interface_flow_simulation() -> bool:
     print("-> Логика реализована во всех функциях")
 
     # Проверяем что у нас есть все необходимые функции
-    from src.game.PyGameBall import get_player_name, show_highscores, show_game_results
+    from game.PyGameBall import get_player_name, show_highscores, show_game_results
 
     print("\n[OK] Все функции интерфейса доступны")
     print(

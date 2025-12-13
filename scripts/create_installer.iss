@@ -2,7 +2,7 @@
 ; Для компиляции требуется Inno Setup Compiler
 
 #define MyAppName "Arkanoid"
-"1.6.2"
+#define MyAppVersion "2.3.0169"
 #define MyAppPublisher "Developer"
 #define MyAppURL "https://github.com/developer/arkanoid"
 #define MyAppExeName "Arkanoid_v{#MyAppVersion}.exe"
@@ -24,7 +24,7 @@ LicenseFile=LICENSE.txt
 InfoBeforeFile=docs/README_RELEASE.txt
 OutputDir=installer
 OutputBaseFilename=Arkanoid_v{#MyAppVersion}_Setup
-SetupIconFile=src/resources/icon.ico
+SetupIconFile=resources/icon.ico
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
@@ -42,10 +42,10 @@ Name: "gamerecords"; Description: "Создать папку для сохран
 
 [Files]
 Source: "Arkanoid_v{#MyAppVersion}.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "sounds\*"; DestDir: "{app}\sounds"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "images\*"; DestDir: "{app}\images"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "src\resources\data\highscores.json"; DestDir: "{app}"; Flags: ignoreversion
-Source: "highscores.py"; DestDir: "{app}"; Flags: ignoreversion
+Source: "resources\audio\*"; DestDir: "{app}\resources\audio"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "resources\images\*"; DestDir: "{app}\resources\images"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "game\data\highscores.json"; DestDir: "{app}\data"; Flags: ignoreversion
+Source: "game\data\settings.json"; DestDir: "{app}\data"; Flags: ignoreversion
 Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "docs\README_RELEASE.md"; DestDir: "{app}"; Flags: ignoreversion
 
@@ -59,17 +59,18 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Uninstall\Arkanoi
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Uninstall\Arkanoid"; ValueType: dword; ValueName: "NoRepair"; ValueData: 1
 
 [Icons]
-Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
-Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: quicklaunchicon
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
+Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#MyAppExeName}"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#MyAppExeName}"; Tasks: quicklaunchicon
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#MyAppExeName}"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: runascurrentuser postinstall skipifsilent
 
 [UninstallDelete]
-Type: filesandordirs; Name: "{localappdata}\Games\Arkanoid\highscores.json"
+Type: filesandordirs; Name: "{localappdata}\Games\Arkanoid\data\highscores.json"
+Type: filesandordirs; Name: "{localappdata}\Games\Arkanoid\data\settings.json"
 
 [UninstallRun]
 Filename: "{cmd}"; Parameters: "/c rmdir /s /q ""{localappdata}\Games\Arkanoid"""; Flags: runascurrentuser
@@ -78,7 +79,6 @@ Filename: "{cmd}"; Parameters: "/c rmdir /s /q ""{localappdata}\Games\Arkanoid""
 function InitializeSetup(): Boolean;
 var
   V: Integer;
-  iResultCode: Integer;
   sPath: String;
 begin
   Result := True;
@@ -87,27 +87,24 @@ begin
   sPath := ExpandConstant('{localappdata}\Games\Arkanoid');
   if not DirExists(sPath) then
     CreateDir(sPath);
+  
+  // Проверяем версию Windows
+  if not RegQueryDWordValue(HKLM, 'SOFTWARE\Microsoft\Windows NT\CurrentVersion', 'ProductVersion', V) then
+  begin
+    MsgBox('Не удалось определить версию Windows. Установка продолжена.', mbWarning, MB_OK);
+  end;
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
   begin
-    // Создаем пустой файл рекордов, если он не существует
-    if not FileExists(ExpandConstant('{localappdata}\Games\Arkanoid\highscores.json')) then
-      SaveStringToFile(ExpandConstant('{localappdata}\Games\Arkanoid\highscores.json'), '[]', False);
-  end;
-end;
-
-function InitializeSetup(): Boolean;
-var
-  V: Integer;
-begin
-  Result := True;
-  
-  // Проверяем версию Windows
-  if not RegQueryDWordValue(HKLM, 'SOFTWARE\Microsoft\Windows NT\CurrentVersion', 'ProductVersion', V) then
-  begin
-    MsgBox('Не удалось определить версию Windows. Установка продолжена.', mbWarning, MB_OK);
+    // Создаем папку data, если она не существует
+    if not DirExists(ExpandConstant('{localappdata}\Games\Arkanoid\data')) then
+      CreateDir(ExpandConstant('{localappdata}\Games\Arkanoid\data'));
+    
+    // Создаем пустой файл рекордов в папке data, если он не существует
+    if not FileExists(ExpandConstant('{localappdata}\Games\Arkanoid\data\highscores.json')) then
+      SaveStringToFile(ExpandConstant('{localappdata}\Games\Arkanoid\data\highscores.json'), '[]', False);
   end;
 end;

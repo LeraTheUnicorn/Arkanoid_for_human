@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "arkanoid-game"
-version = "2.3.161"  # Poetry формат: X.Y.Z (соответствует version.py: VERSION_MAJOR=2, VERSION_MINOR=3, VERSION_BUILD=161)
+version = "2.3.169"  # Poetry формат: X.Y.Z (соответствует version.py: VERSION_MAJOR=2, VERSION_MINOR=3, VERSION_BUILD=169)
 description = "Игра Арканоид"
 authors = ["Developer <dadbarn@gmail.com>"]
 readme = "README.MD"

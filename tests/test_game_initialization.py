@@ -17,55 +17,17 @@ def test_imports() -> bool:
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
     try:
-        from src.game.PyGameBall import Paddle, Ball, build_bricks
+        from game.PyGameBall import Paddle, Ball, build_bricks
 
         print("PASS: Main game modules imported successfully")
     except Exception as e:
         print(f"✗ Failed to import main game modules: {e}")
         return False
 
-    try:
-        from src.ai.ai_player import AIPlayer
-        from src.ai.learning_system import LearningSystem
-        from src.ai.position_optimizer import PositionOptimizer
-        from src.ai.trajectory_predictor import TrajectoryPredictor
-        from src.ai.game_state import GameState
-
-        print("✓ AI modules imported successfully")
-    except Exception as e:
-        print(f"✗ Failed to import AI modules: {e}")
-        return False
+    # AI mode removed from project - skipping AI module tests
+    print("✓ AI modules test skipped (AI mode removed)")
 
     return True
-
-
-def test_ai_initialization() -> bool:
-    """Тест инициализации AI системы"""
-    print("\nTesting AI initialization...")
-
-    try:
-        from src.ai.ai_player import AIPlayer
-
-        # Создаем AIPlayer
-        ai_player: AIPlayer = AIPlayer(800, 600, debug_mode=False)
-        ai_player.activate()
-
-        print(f"✓ AIPlayer created and activated: {ai_player.is_active}")
-
-        # Создаем другие компоненты
-        from src.ai.learning_system import LearningSystem
-        from src.ai.position_optimizer import PositionOptimizer
-
-        learning_system: LearningSystem = LearningSystem()
-        position_optimizer: PositionOptimizer = PositionOptimizer(800, 600)
-
-        print("✓ All AI components initialized successfully")
-
-        return True
-
-    except Exception as e:
-        print(f"✗ Failed to initialize AI components: {e}")
-        return False
 
 
 def test_game_objects() -> bool:
@@ -78,7 +40,7 @@ def test_game_objects() -> bool:
 
         pygame.init()
 
-        from src.game.PyGameBall import Paddle, Ball, build_bricks
+        from game.PyGameBall import Paddle, Ball, build_bricks
 
         # Создаем объекты
         paddle: Paddle = Paddle()
@@ -103,7 +65,6 @@ def main() -> bool:
 
     tests: List[Tuple[str, Callable[[], bool]]] = [
         ("Import Test", test_imports),
-        ("AI Initialization Test", test_ai_initialization),
         ("Game Objects Test", test_game_objects),
     ]
 

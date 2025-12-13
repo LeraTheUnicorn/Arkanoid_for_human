@@ -84,18 +84,17 @@ def get_game_directory() -> str:
     """
     Определяет каталог игры с поддержкой кроссплатформенности.
     
-    Для разработки: src/resources/
+    Для разработки: корень проекта (где находится game/)
     Для exe: каталог установки (Windows: LOCALAPPDATA, Linux/Mac: XDG_DATA_HOME или ~/.local/share)
     
     Returns:
-        Путь к каталогу игры
+        Путь к корню проекта (для разработки) или каталогу данных игры (для exe)
     """
-    # Для разработки (запуск из IDE) используем src/resources/
+    # Для разработки (запуск из IDE) используем корень проекта
     if not getattr(sys, "frozen", False):
-        current_dir = os.path.dirname(os.path.abspath(__file__))  # src/game/
-        src_dir = os.path.dirname(current_dir)  # src/
-        resources_dir = os.path.join(src_dir, "resources")  # src/resources/
-        return resources_dir
+        current_dir = os.path.dirname(os.path.abspath(__file__))  # game/
+        project_root = os.path.dirname(current_dir)  # корень проекта
+        return project_root
 
     # Для exe файлов используем системные каталоги
     if sys.platform == "win32":
@@ -128,6 +127,9 @@ def get_highscores_file_path(custom_path: Optional[str] = None) -> str:
     """
     Возвращает полный путь к файлу рекордов.
     
+    Для разработки: game/data/highscores.json
+    Для exe: каталог данных игры/data/highscores.json
+    
     Args:
         custom_path: Опциональный пользовательский путь (для тестирования)
         
@@ -137,26 +139,29 @@ def get_highscores_file_path(custom_path: Optional[str] = None) -> str:
     if custom_path:
         return custom_path
     
+    # Для разработки используем game/data/
+    if not getattr(sys, "frozen", False):
+        current_dir = os.path.dirname(os.path.abspath(__file__))  # game/
+        data_dir = os.path.join(current_dir, "data")
+        try:
+            os.makedirs(data_dir, exist_ok=True)
+        except (OSError, PermissionError) as e:
+            logger.warning(f"Не удалось создать каталог {data_dir}: {e}")
+            # Fallback: текущая директория
+            data_dir = current_dir
+        return os.path.join(data_dir, "highscores.json")
+    
+    # Для exe файлов используем каталог данных игры
     game_dir = get_game_directory()
-    resources_dir = os.path.join(game_dir, "resources")
-    data_dir = os.path.join(resources_dir, "data")
+    data_dir = os.path.join(game_dir, "data")
 
     # Создаем каталоги, если они не существуют
     try:
         os.makedirs(data_dir, exist_ok=True)
     except (OSError, PermissionError) as e:
         logger.warning(f"Не удалось создать каталог {data_dir}: {e}")
-        # Если не удается создать каталог, используем fallback - src/resources/data
-        current_dir = os.path.dirname(os.path.abspath(__file__))  # src/game/
-        src_dir = os.path.dirname(current_dir)  # src/
-        fallback_resources = os.path.join(src_dir, "resources")  # src/resources/
-        data_dir = os.path.join(fallback_resources, "data")
-        try:
-            os.makedirs(data_dir, exist_ok=True)
-        except (OSError, PermissionError) as e2:
-            logger.warning(f"Не удалось создать fallback каталог {data_dir}: {e2}")
-            # Последний fallback: каталог без resources/data
-            data_dir = os.path.dirname(os.path.abspath(__file__))
+        # Fallback: каталог игры
+        data_dir = game_dir
 
     return os.path.join(data_dir, "highscores.json")
 

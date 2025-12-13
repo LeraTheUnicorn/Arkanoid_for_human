@@ -10,7 +10,7 @@ from typing import List, Dict, Any, Optional
 # Добавляем корневую директорию в путь для импорта модулей
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.game.highscores import HighScoreManager
+from game.highscores import HighScoreManager
 import json
 
 
@@ -99,10 +99,10 @@ def test_display_highscores_format() -> bool:
 
     try:
         # Создаем менеджер с тестовыми данными
-        from src.game.highscores import HIGHSCORES_FILE
+        from game.highscores import HIGHSCORES_FILE
 
         original_file: Optional[str] = HIGHSCORES_FILE
-        import highscores
+        import game.highscores as highscores
 
         highscores.HIGHSCORES_FILE = "test_display_highscores.json"
 
@@ -173,7 +173,7 @@ def test_display_highscores_format() -> bool:
     finally:
         # Восстанавливаем оригинальный файл
         if original_file is not None:
-            import highscores
+            import game.highscores as highscores
 
             highscores.HIGHSCORES_FILE = original_file
 
@@ -192,10 +192,10 @@ def test_empty_highscores() -> bool:
         json.dump([], f)
 
     try:
-        from src.game.highscores import HIGHSCORES_FILE
+        from game.highscores import HIGHSCORES_FILE
 
         original_file: Optional[str] = HIGHSCORES_FILE
-        import highscores
+        import game.highscores as highscores
 
         highscores.HIGHSCORES_FILE = "test_empty_highscores.json"
 
@@ -214,7 +214,7 @@ def test_empty_highscores() -> bool:
 
     finally:
         if original_file is not None:
-            import highscores
+            import game.highscores as highscores
 
             highscores.HIGHSCORES_FILE = original_file
         if os.path.exists("test_empty_highscores.json"):

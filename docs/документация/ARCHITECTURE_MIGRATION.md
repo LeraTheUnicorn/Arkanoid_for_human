@@ -19,6 +19,8 @@
 - `game/game_controllers.py` - контроллеры игровой логики
 - `game/dirty_rects.py` - система оптимизации отрисовки
 - `game/di_container.py` - контейнер для Dependency Injection
+- `game/version.py` - управление версией (автоматически увеличивается при сборке)
+- `game/data/` - данные игры (рекорды, настройки)
 
 ### Основной файл
 

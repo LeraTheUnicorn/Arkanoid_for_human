@@ -242,20 +242,19 @@ _settings_file_path_cache: Optional[str] = None
 def get_game_directory() -> str:
     """
     Определяет каталог игры.
-    При запуске из студии разработки использует src/resources,
+    При запуске из студии разработки использует корень проекта,
     иначе использует директорию exe файла.
     
     Returns:
-        Путь к каталогу игры (где находятся resources)
+        Путь к корню проекта (для разработки) или каталогу данных игры (для exe)
     """
     # Проверяем, запущено ли приложение как exe или как скрипт Python
     if not getattr(sys, "frozen", False):
         # Если приложение запущено как скрипт Python (из студии разработки)
-        # Файл находится в src/game/, нужно подняться на уровень вверх и войти в src/resources/
-        current_dir = os.path.dirname(os.path.abspath(__file__))  # src/game/
-        src_dir = os.path.dirname(current_dir)  # src/
-        resources_dir = os.path.join(src_dir, "resources")  # src/resources/
-        return resources_dir
+        # Файл находится в game/, поднимаемся на уровень вверх к корню проекта
+        current_dir = os.path.dirname(os.path.abspath(__file__))  # game/
+        project_root = os.path.dirname(current_dir)  # корень проекта
+        return project_root
     
     # Для exe файлов используем директорию exe файла (там находятся ресурсы после сборки)
     return os.path.dirname(sys.executable)
@@ -280,29 +279,32 @@ def get_settings_file_path() -> str:
         return _settings_file_path_cache
     
     try:
-        game_dir = get_game_directory()
-        
-        # Безопасное объединение путей с защитой от path traversal
-        resources_dir = safe_join_path(game_dir, "resources")
-        
-        # Создаем каталог resources, если он не существует
-        if not os.path.exists(resources_dir):
+        # Для разработки используем game/data/
+        if not getattr(sys, "frozen", False):
+            current_dir = os.path.dirname(os.path.abspath(__file__))  # game/
+            data_dir = os.path.join(current_dir, "data")
             try:
-                os.makedirs(resources_dir, exist_ok=True)
+                os.makedirs(data_dir, exist_ok=True)
             except (OSError, PermissionError) as e:
-                logger.warning(f"Не удалось создать каталог {resources_dir}: {e}")
-                # Если не удается создать каталог, используем fallback - src/resources
-                current_dir = os.path.dirname(os.path.abspath(__file__))  # src/game/
-                src_dir = os.path.dirname(current_dir)  # src/
-                resources_dir = os.path.join(src_dir, "resources")  # src/resources/
-                if not os.path.exists(resources_dir):
-                    try:
-                        os.makedirs(resources_dir, exist_ok=True)
-                    except (OSError, PermissionError) as e2:
-                        logger.error(f"Не удалось создать резервный каталог {resources_dir}: {e2}")
-                        raise
-        
-        settings_path = os.path.join(resources_dir, "settings.json")
+                logger.warning(f"Не удалось создать каталог {data_dir}: {e}")
+                # Fallback: текущая директория
+                data_dir = current_dir
+            settings_path = os.path.join(data_dir, "settings.json")
+        else:
+            # Для exe файлов используем каталог данных игры
+            game_dir = get_game_directory()
+            data_dir = os.path.join(game_dir, "data")
+            
+            # Создаем каталог data, если он не существует
+            if not os.path.exists(data_dir):
+                try:
+                    os.makedirs(data_dir, exist_ok=True)
+                except (OSError, PermissionError) as e:
+                    logger.warning(f"Не удалось создать каталог {data_dir}: {e}")
+                    # Fallback: каталог игры
+                    data_dir = game_dir
+            
+            settings_path = os.path.join(data_dir, "settings.json")
         
         # Кэшируем путь
         _settings_file_path_cache = settings_path

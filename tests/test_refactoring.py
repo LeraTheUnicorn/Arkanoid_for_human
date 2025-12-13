@@ -9,8 +9,8 @@ from typing import List
 # Добавляем родительскую директорию в путь для импорта модулей
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.game.PyGameBall import Ball, Paddle, build_bricks
-from src.game.settings import SettingsManager
+from game.PyGameBall import Ball, Paddle, build_bricks
+from game.settings import SettingsManager
 
 
 def test_ball_class() -> None:
@@ -30,20 +30,20 @@ def test_ball_class() -> None:
     settings: SettingsManager = SettingsManager()
 
     # Тестируем увеличение скорости
-    ball.increase_speed(settings, auto_mode=False)
+    ball.increase_speed(settings)
     print(f"OK: Speed increased: {ball.get_speed()}")
 
     # Тестируем уменьшение скорости
-    ball.decrease_speed(settings, auto_mode=False)
+    ball.decrease_speed(settings)
     print(f"OK: Speed decreased: {ball.get_speed()}")
 
     # Тестируем ограничения
     for _ in range(15):  # Пытаемся увеличить больше максимума
-        ball.increase_speed(settings, auto_mode=False)
+        ball.increase_speed(settings)
     print(f"OK: Max limit works: {ball.get_speed()}")
 
     for _ in range(15):  # Пытаемся уменьшить меньше минимума
-        ball.decrease_speed(settings, auto_mode=False)
+        ball.decrease_speed(settings)
     print(f"OK: Min limit works: {ball.get_speed()}")
 
     print("OK: All Ball class tests passed!\n")
@@ -89,7 +89,7 @@ def test_reset_game() -> None:
     paddle: Paddle = Paddle()
     ball: Ball = Ball()
     ball.set_speed(6)
-    from src.game.PyGameBall import build_bricks
+    from game.PyGameBall import build_bricks
 
     bricks: List[object] = build_bricks()
     score: int = 10

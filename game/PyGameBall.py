@@ -2,6 +2,17 @@
 # Версия импортируется из централизованного файла version.py
 
 import os
+import sys
+
+# Исправление для запуска файла напрямую: добавляем корневую директорию проекта в sys.path
+# Это должно быть сделано ДО всех остальных импортов
+current_file = os.path.abspath(__file__)
+current_dir = os.path.dirname(current_file)  # game/
+# Поднимаемся на один уровень вверх: game/ -> project_root
+project_root = os.path.dirname(current_dir)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 import warnings
 from contextlib import contextmanager
 from typing import Generator
@@ -19,47 +30,94 @@ os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"  # Скрыть сообщени�
 import random
 import time
 import numpy as np
-import sys
 from dataclasses import dataclass, field
 from typing import List, Tuple, Optional, Any
-
-# Исправление для запуска файла напрямую: добавляем корневую директорию проекта в sys.path
-if __name__ == "__main__":
-    # Получаем путь к директории, содержащей этот файл
-    current_file = os.path.abspath(__file__)
-    current_dir = os.path.dirname(current_file)
-    # Поднимаемся на два уровня вверх: src/game -> src -> project_root
-    project_root = os.path.dirname(os.path.dirname(current_dir))
-    if project_root not in sys.path:
-        sys.path.insert(0, project_root)
 
 # Базовое логирование
 import logging
 from datetime import datetime
 
 # Создаем директорию для логов
-log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
+# Для установленного приложения используем каталог данных игры
+if getattr(sys, "frozen", False):
+    # Для exe файлов используем системные каталоги
+    if sys.platform == "win32":
+        # Windows: используем LOCALAPPDATA
+        try:
+            localappdata = os.environ.get("LOCALAPPDATA")
+            if localappdata:
+                game_dir = os.path.join(localappdata, "Games", "Arkanoid")
+                log_dir = os.path.join(game_dir, "logs")
+            else:
+                # Fallback: директория exe
+                log_dir = os.path.join(os.path.dirname(sys.executable), "logs")
+        except (KeyError, OSError):
+            # Fallback: директория exe
+            log_dir = os.path.join(os.path.dirname(sys.executable), "logs")
+    else:
+        # Linux/Mac: используем XDG_DATA_HOME или ~/.local/share
+        try:
+            xdg_data_home = os.environ.get("XDG_DATA_HOME")
+            if xdg_data_home:
+                game_dir = os.path.join(xdg_data_home, "Arkanoid")
+            else:
+                home = os.path.expanduser("~")
+                game_dir = os.path.join(home, ".local", "share", "Arkanoid")
+            log_dir = os.path.join(game_dir, "logs")
+        except (KeyError, OSError):
+            # Fallback: директория exe
+            log_dir = os.path.join(os.path.dirname(sys.executable), "logs")
+else:
+    # В режиме разработки используем logs/ в корне проекта
+    log_dir = os.path.join(project_root, "logs")
+
 try:
     os.makedirs(log_dir, exist_ok=True)
 except (OSError, PermissionError):
-    # Если не удалось создать в src1/logs, используем текущую директорию
+    # Если не удалось создать в logs, используем текущую директорию
     log_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Удаляем старые файлы логов при запуске
+try:
+    if os.path.exists(log_dir):
+        for filename in os.listdir(log_dir):
+            file_path = os.path.join(log_dir, filename)
+            # Удаляем только файлы логов (начинающиеся с "game_" и заканчивающиеся на ".log")
+            if os.path.isfile(file_path) and filename.startswith("game_") and filename.endswith(".log"):
+                try:
+                    os.remove(file_path)
+                except (OSError, PermissionError) as e:
+                    # Если не удалось удалить файл, просто пропускаем его
+                    if not getattr(sys, "frozen", False):
+                        print(f"[WARNING] Не удалось удалить старый лог файл {file_path}: {e}")
+except (OSError, PermissionError) as e:
+    # Если не удалось очистить логи, продолжаем работу
+    if not getattr(sys, "frozen", False):
+        print(f"[WARNING] Не удалось очистить каталог логов: {e}")
 
 # Имя файла лога с датой и временем
 log_filename = f"game_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
 log_filepath = os.path.join(log_dir, log_filename)
 
-# Настраиваем логирование с записью в файл и консоль
+# Проверяем переменную окружения для управления логированием в консоль
+# ENABLE_CONSOLE_LOGGING может быть: "1", "true", "yes" (включить) или "0", "false", "no" (выключить)
+# По умолчанию включено для обратной совместимости
+enable_console_logging = os.environ.get("ENABLE_CONSOLE_LOGGING", "1").lower() in ("1", "true", "yes")
+
+# Настраиваем обработчики логирования
+handlers: list[logging.Handler] = [logging.FileHandler(log_filepath, encoding='utf-8')]
+if enable_console_logging:
+    handlers.append(logging.StreamHandler())  # Вывод в консоль
+
+# Настраиваем логирование
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(log_filepath, encoding='utf-8'),
-        logging.StreamHandler()  # Также выводим в консоль
-    ]
+    handlers=handlers
 )
 logger = logging.getLogger(__name__)
-logger.info(f"Логирование настроено. Лог файл: {log_filepath}")
+console_status = "включено" if enable_console_logging else "выключено"
+logger.info(f"Логирование настроено. Лог файл: {log_filepath}, консоль: {console_status}")
 
 # Импортируем pygame с ограниченным подавлением предупреждений
 with suppress_pkg_resources_warnings():
@@ -73,9 +131,9 @@ try:
     from .game_models import Ball, Paddle
 except ImportError:
     # Если относительные импорты не работают (когда запускается напрямую), используем абсолютные
-    from src1.game.highscores import HighScoreManager
-    from src1.game.settings import SettingsManager
-    from src1.game.game_models import Ball, Paddle
+    from game.highscores import HighScoreManager
+    from game.settings import SettingsManager
+    from game.game_models import Ball, Paddle
 
 def resource_path(relative_path: str) -> str:
     """
@@ -86,25 +144,54 @@ def resource_path(relative_path: str) -> str:
     
     Args:
         relative_path: Относительный путь к ресурсу (например, "audio/file.ogg" или "images/d2.gif")
-                      Путь должен быть относительно src/resources/
+                      Путь должен быть относительно resources/
         
     Returns:
         Абсолютный путь к ресурсу, нормализованный для текущей ОС
         
     Note:
-        В режиме разработки использует директорию src/resources/.
-        В скомпилированном exe (PyInstaller) ресурсы находятся в _MEIPASS/src/resources/.
+        В режиме разработки использует директорию resources/ в корне проекта.
+        В скомпилированном exe (PyInstaller) ресурсы находятся в _MEIPASS/resources/.
+        После установки через MSI ресурсы находятся в {app}/resources/ рядом с exe.
     """
-    try:
-        # PyInstaller создает временную папку и сохраняет путь в _MEIPASS
-        base_path = sys._MEIPASS  # type: ignore[attr-defined]
-        # В exe ресурсы находятся в src/resources/ (как указано в --add-data)
-        resources_path = os.path.join(base_path, "src", "resources")
-    except AttributeError:
-        # В режиме разработки файл находится в src/game/, нужно подняться на уровень вверх и войти в src/resources/
-        current_dir = os.path.dirname(os.path.abspath(__file__))  # src/game/
-        src_dir = os.path.dirname(current_dir)  # src/
-        resources_path = os.path.join(src_dir, "resources")  # src/resources/
+    # Проверяем, запущено ли приложение как exe
+    if getattr(sys, "frozen", False):
+        # Для установленного через MSI exe: ресурсы находятся рядом с exe в resources/
+        # СНАЧАЛА проверяем путь рядом с exe (для установленного через MSI)
+        exe_dir = os.path.dirname(sys.executable)
+        resources_path = os.path.join(exe_dir, "resources")
+        
+        # Проверяем существование файла ресурса по этому пути
+        test_path = os.path.join(resources_path, relative_path)
+        if os.path.exists(test_path):
+            # Ресурсы найдены рядом с exe (установлено через MSI)
+            full_path = os.path.join(resources_path, relative_path)
+            return os.path.normpath(full_path)
+        
+        # Если не найдено рядом с exe, пробуем альтернативные пути
+        alt_paths = [
+            os.path.join(exe_dir, "..", "resources"),  # На уровень выше
+            os.path.join(os.path.dirname(exe_dir), "resources"),  # Родительская директория
+        ]
+        for alt_path in alt_paths:
+            alt_path = os.path.normpath(alt_path)
+            test_path = os.path.join(alt_path, relative_path)
+            if os.path.exists(test_path):
+                full_path = os.path.join(alt_path, relative_path)
+                return os.path.normpath(full_path)
+        
+        # Если не найдено рядом с exe, используем _MEIPASS (для PyInstaller без установки)
+        try:
+            base_path = sys._MEIPASS  # type: ignore[attr-defined]
+            resources_path = os.path.join(base_path, "resources")
+            full_path = os.path.join(resources_path, relative_path)
+            return os.path.normpath(full_path)
+        except AttributeError:
+            # Fallback: пробуем resources/ в корне проекта (для разработки)
+            resources_path = os.path.join(project_root, "resources")
+    else:
+        # В режиме разработки используем resources/ в корне проекта
+        resources_path = os.path.join(project_root, "resources")
 
     # Используем os.path.join для кросс-платформенной совместимости
     # и нормализуем путь для корректной работы на всех ОС
@@ -133,7 +220,7 @@ try:
         SEPARATION_ZONE_TOP,
     )
 except ImportError:
-    from src1.game.game_config import (
+    from game.game_config import (
         BALL_SIZE,
         BALL_SPEED_DEFAULT,
         BRICK_COLS,
@@ -511,10 +598,15 @@ def trigger_instant_victory(
     """
     # Показываем заставку победы
     try:
+        logger.info("Показываю заставку победы...")
         show_victory_splash(screen, duration_seconds=5.0)
+        logger.info("Заставка победы показана успешно")
     except Exception as e:
+        logger.error(f"Ошибка при показе заставки победы: {e}")
+        import traceback
+        logger.error(f"Трассировка ошибки:\n{traceback.format_exc()}")
+        # В установленной версии также логируем ошибки
         if not getattr(sys, "frozen", False):
-            import traceback
             traceback.print_exc()
     
     # Показываем экран результатов
@@ -539,12 +631,49 @@ def show_victory_splash(screen: pygame.Surface, duration_seconds: float = 5.0) -
         screen: Поверхность pygame для отрисовки
         duration_seconds: Длительность показа заставки в секундах (по умолчанию 5)
     """
+    logger.info("=== НАЧАЛО ПОКАЗА АНИМАЦИИ ПОБЕДЫ ===")
+    logger.info(f"Длительность показа: {duration_seconds} секунд")
+    
     # Загружаем изображение
     image_path = resource_path("images/d2.gif")
+    logger.info(f"Получен путь через resource_path: {image_path}")
+    
+    # Логируем путь для диагностики
+    logger.debug(f"Путь к анимации победы: {image_path}")
+    logger.debug(f"Файл существует: {os.path.exists(image_path)}")
+    
+    if not os.path.exists(image_path):
+        logger.warning(f"Анимация не найдена по пути: {image_path}")
+        # Пробуем альтернативные пути для установленного через MSI приложения
+        if getattr(sys, "frozen", False):
+            exe_dir = os.path.dirname(sys.executable)
+            alt_paths = [
+                os.path.join(exe_dir, "resources", "images", "d2.gif"),
+                os.path.join(exe_dir, "..", "resources", "images", "d2.gif"),
+            ]
+            for alt_path in alt_paths:
+                alt_path = os.path.normpath(alt_path)
+                logger.debug(f"Проверяю альтернативный путь: {alt_path} (существует: {os.path.exists(alt_path)})")
+                if os.path.exists(alt_path):
+                    logger.info(f"Найден альтернативный путь: {alt_path}")
+                    image_path = alt_path
+                    break
+        else:
+            # В режиме разработки проверяем прямой путь
+            dev_path = os.path.join(project_root, "resources", "images", "d2.gif")
+            if os.path.exists(dev_path):
+                logger.info(f"Использую путь разработки: {dev_path}")
+                image_path = dev_path
+    
+    # Финальная проверка - если файл все еще не найден, выходим
+    if not os.path.exists(image_path):
+        logger.error(f"Анимация победы не найдена ни по одному из путей! Финальный путь: {image_path}")
+        return
     
     try:
         # Используем PIL для загрузки и изменения размера GIF (НЕ МЕНЯЕМ размер окна!)
         try:
+            logger.debug(f"Пытаюсь загрузить анимацию через PIL: {image_path}")
             from PIL import Image, ImageSequence
             
             # Получаем размеры экрана (НЕ МЕНЯЕМ их!)
@@ -560,17 +689,23 @@ def show_victory_splash(screen: pygame.Surface, duration_seconds: float = 5.0) -
                 lanczos_filter: Any = getattr(Image, 'LANCZOS', 1)  # type: ignore[no-redef]  # 1 - это числовая константа LANCZOS
             
             # Загружаем GIF с помощью PIL
+            logger.debug(f"Открываю GIF файл: {image_path}")
             with Image.open(image_path) as im:
+                logger.debug(f"GIF открыт успешно. Формат: {im.format}, Размер: {im.size}, Режим: {im.mode}")
                 # Получаем длительность кадров из метаданных
                 default_duration = im.info.get("duration", 100)
+                logger.debug(f"Длительность кадра по умолчанию: {default_duration} мс")
                 
                 # Изменяем размер каждого кадра до размера экрана (800x600)
                 frames = []
                 frame_durations = []
                 
+                frame_count = 0
                 for i, frame in enumerate(ImageSequence.Iterator(im)):
+                    frame_count += 1
                     # Копируем кадр и изменяем размер до размера экрана
                     resized_frame = frame.copy().resize((screen_width, screen_height), lanczos_filter)
+                    logger.debug(f"Обработан кадр {i+1}, размер: {resized_frame.size}")
                     
                     # Получаем длительность кадра
                     duration = frame.info.get("duration", default_duration)
@@ -599,7 +734,9 @@ def show_victory_splash(screen: pygame.Surface, duration_seconds: float = 5.0) -
                     frames.append(frame_surface)
                     
             
+            logger.info(f"Загружено кадров анимации: {len(frames)}")
             if len(frames) == 0:
+                logger.error("Не удалось загрузить кадры анимации - список кадров пуст")
                 raise ValueError("Не удалось загрузить кадры анимации")
             
             # Изображение уже имеет размер экрана, координаты (0, 0)
@@ -614,10 +751,13 @@ def show_victory_splash(screen: pygame.Surface, duration_seconds: float = 5.0) -
             frame_accumulator = 0.0
             last_frame_time = time.time()
             
+            logger.info(f"Начинаю показ анимации. Кадров: {len(frames)}, Длительность: {duration_seconds} сек")
+            
             # Показываем заставку в течение указанного времени
             
             # Если только один кадр, просто показываем его
             if len(frames) == 1:
+                logger.debug("Показываю один кадр анимации")
                 while time.time() - start_time < duration_seconds:
                     for event in pygame.event.get():
                         if event.type == pygame.QUIT:
@@ -628,6 +768,7 @@ def show_victory_splash(screen: pygame.Surface, duration_seconds: float = 5.0) -
                     clock.tick(30)
             else:
                 # Анимация с несколькими кадрами
+                logger.debug(f"Показываю анимацию с {len(frames)} кадрами")
                 while time.time() - start_time < duration_seconds:
                     # Обрабатываем события (чтобы окно не зависало)
                     for event in pygame.event.get():
@@ -657,19 +798,29 @@ def show_victory_splash(screen: pygame.Surface, duration_seconds: float = 5.0) -
                     screen.fill((0, 0, 0))
                     
                     # Рисуем текущий кадр (уже размером с экран)
-                    screen.blit(frames[frame_index], (x, y))
+                    try:
+                        screen.blit(frames[frame_index], (x, y))
+                    except (IndexError, pygame.error) as blit_error:
+                        logger.error(f"Ошибка при отрисовке кадра {frame_index}: {blit_error}")
+                        # Если ошибка при отрисовке, выходим
+                        return
                     
                     # Обновляем экран
                     pygame.display.flip()
                     
                     # Ограничиваем FPS для плавной анимации
                     clock.tick(30)
+                
+                logger.info(f"Анимация показана успешно. Прошло времени: {time.time() - start_time:.2f} сек")
                     
         except (ImportError, Exception) as e:
             # Если PIL не установлен или произошла ошибка, используем pygame для загрузки первого кадра
+            logger.warning(f"Ошибка при загрузке через PIL: {e}. Пробую загрузить через pygame")
             # Загружаем статическое изображение через pygame (только первый кадр)
             try:
+                logger.debug(f"Пытаюсь загрузить через pygame: {image_path}")
                 image = pygame.image.load(image_path)
+                logger.debug(f"Изображение загружено через pygame. Размер: {image.get_size()}")
                 
                 # Получаем размеры экрана (НЕ МЕНЯЕМ их!)
                 screen_width, screen_height = screen.get_size()
@@ -705,17 +856,17 @@ def show_victory_splash(screen: pygame.Surface, duration_seconds: float = 5.0) -
                     
             except Exception as e2:
                 # Если даже pygame не может загрузить, просто выходим и переходим к результатам
-                if not getattr(sys, "frozen", False):
-                    import traceback
-                    traceback.print_exc()
+                logger.error(f"Ошибка при загрузке через pygame: {e2}")
+                import traceback
+                logger.error(f"Трассировка ошибки:\n{traceback.format_exc()}")
                 # Выходим из функции, чтобы сразу перейти к экрану результатов
                 return
                 
     except Exception as e:
         # Если не удалось загрузить изображение, просто выходим и переходим к результатам
-        if not getattr(sys, "frozen", False):
-            import traceback
-            traceback.print_exc()
+        logger.error(f"Критическая ошибка при загрузке анимации победы: {e}")
+        import traceback
+        logger.error(f"Трассировка ошибки:\n{traceback.format_exc()}")
         # Выходим из функции, чтобы сразу перейти к экрану результатов
         return
 
@@ -881,7 +1032,7 @@ def draw_bricks(screen: pygame.Surface, bricks: List[pygame.Rect]) -> None:
     try:
         from .game_config import BRICK_COLORS, BRICK_BORDER_COLOR
     except ImportError:
-        from src1.game.game_config import BRICK_COLORS, BRICK_BORDER_COLOR
+        from game.game_config import BRICK_COLORS, BRICK_BORDER_COLOR
     
     for idx, brick in enumerate(bricks):
         color = BRICK_COLORS[idx // BRICK_COLS % len(BRICK_COLORS)]
@@ -939,6 +1090,13 @@ def draw_start_hint(screen: pygame.Surface, font: pygame.font.Font) -> None:
     rect = surf.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
     screen.blit(surf, rect)
 
+def draw_pause_hint(screen: pygame.Surface, font: pygame.font.Font) -> None:
+    """Отображает подсказку о паузе при потере жизни"""
+    text = "Нажмите SPACE для продолжения"
+    surf = font.render(text, True, (255, 255, 255))
+    rect = surf.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
+    screen.blit(surf, rect)
+
 def main() -> None:
     startup_start_time = time.time()
     if not getattr(sys, "frozen", False):
@@ -985,8 +1143,8 @@ def main() -> None:
                 # Файл не найден - выводим отладочную информацию только в режиме разработки
                 if not getattr(sys, "frozen", False):
                     print(f"[DEBUG] Файл музыки не найден по пути: {music_path}")
-                    # Пробуем альтернативный путь относительно текущей директории
-                    alt_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "resources", "audio", "Night_Prowler.ogg")
+                    # Пробуем альтернативный путь относительно корня проекта
+                    alt_path = os.path.join(project_root, "resources", "audio", "Night_Prowler.ogg")
                     alt_path = os.path.normpath(alt_path)
                     if os.path.exists(alt_path):
                         print(f"[DEBUG] Найден альтернативный путь: {alt_path}")
@@ -1008,6 +1166,7 @@ def main() -> None:
     lives_left = MAX_LIVES
     game_over = False
     game_started = False
+    game_paused = False  # Флаг паузы при потере жизни
     running = True
     sound_enabled = True
     should_exit = False  # Флаг для полного выхода из игры
@@ -1026,6 +1185,7 @@ def main() -> None:
         score = 0
         game_over = False
         game_started = False
+        game_paused = False
 
         # Ввод имени игрока
         player_name, sound_enabled, exit_game = get_player_name(screen, font, big_font, highscore_manager)
@@ -1083,22 +1243,33 @@ def main() -> None:
                         else:
                             pygame.mixer.music.play(-1)
                             sound_enabled = True
+                    elif event.key == pygame.K_SPACE:
+                        # Выход из паузы при потере жизни - сразу продолжаем игру
+                        if game_paused:
+                            game_paused = False
+                            # Если игра была запущена, сразу запускаем мяч
+                            if game_started:
+                                # Восстанавливаем скорость мяча в случайном направлении
+                                ball.vel_x = random.choice([-ball.get_speed(), ball.get_speed()])
+                                ball.vel_y = -ball.get_speed()
                     elif event.key == pygame.K_UP:
-                        # Увеличение скорости мяча
+                        # Увеличение скорости мяча (работает даже во время паузы)
                         ball.increase_speed(settings_manager)
                     elif event.key == pygame.K_DOWN:
-                        # Уменьшение скорости мяча
+                        # Уменьшение скорости мяча (работает даже во время паузы)
                         ball.decrease_speed(settings_manager)
                     elif event.key == pygame.K_LEFT:
-                        # Начало движения влево
-                        left_key_pressed = True
-                        if not game_over:
-                            paddle.move(-1)
+                        # Начало движения влево (не работает во время паузы)
+                        if not game_paused:
+                            left_key_pressed = True
+                            if not game_over:
+                                paddle.move(-1)
                     elif event.key == pygame.K_RIGHT:
-                        # Начало движения вправо
-                        right_key_pressed = True
-                        if not game_over:
-                            paddle.move(1)
+                        # Начало движения вправо (не работает во время паузы)
+                        if not game_paused:
+                            right_key_pressed = True
+                            if not game_over:
+                                paddle.move(1)
                     elif event.key == pygame.K_1 or event.key == ord('1'):
                         # Обработка тройного нажатия "1" для немедленной победы
                         current_time = time.time()
@@ -1160,7 +1331,14 @@ def main() -> None:
                             # Обработка перезапуска
                             if restart_game:
                                 # Перезапускаем игру - ПОЛНЫЙ СБРОС СОСТОЯНИЯ
+                                # Сначала очищаем все события клавиатуры, чтобы избежать "залипания" клавиш
+                                pygame.event.clear(pygame.KEYDOWN)
+                                pygame.event.clear(pygame.KEYUP)
+                                
                                 paddle = Paddle()
+                                # Убеждаемся, что платформа в центре экрана
+                                paddle.rect.centerx = SCREEN_WIDTH // 2
+                                
                                 ball = Ball()
                                 ball_speed = settings_manager.get_ball_speed()
                                 ball.set_speed(ball_speed)
@@ -1171,6 +1349,7 @@ def main() -> None:
                                 lives_left = MAX_LIVES
                                 game_over = False
                                 game_started = False
+                                game_paused = False
                                 # Сброс состояния клавиш платформы
                                 left_key_pressed = False
                                 right_key_pressed = False
@@ -1193,22 +1372,30 @@ def main() -> None:
             # Пропускаем обработку кадра после перезапуска
             if skip_frame_processing:
                 skip_frame_processing = False
+                # Убеждаемся, что платформа в центре экрана после перезапуска
+                paddle.rect.centerx = SCREEN_WIDTH // 2
                 # Продолжаем цикл для отрисовки нового состояния
                 continue
             
             keys = pygame.key.get_pressed()
             
-            if not game_started:
+            # Позиционируем мяч на платформе если игра не запущена или на паузе
+            if not game_started and not game_paused:
                 ball.rect.center = paddle.rect.midtop
                 ball.rect.y -= BALL_SIZE
-                if keys[pygame.K_LEFT]:
+                # Игнорируем Enter при проверке старта игры (чтобы избежать случайного старта)
+                if keys[pygame.K_LEFT] and not keys[pygame.K_RETURN]:
                     game_started = True
                     ball.vel_x = -ball.get_speed()
                     ball.vel_y = -ball.get_speed()
-                elif keys[pygame.K_RIGHT]:
+                elif keys[pygame.K_RIGHT] and not keys[pygame.K_RETURN]:
                     game_started = True
                     ball.vel_x = ball.get_speed()
                     ball.vel_y = -ball.get_speed()
+            elif game_paused:
+                # Во время паузы мяч должен быть на платформе
+                ball.rect.center = paddle.rect.midtop
+                ball.rect.y -= BALL_SIZE
             # Обработка перезапуска после окончания игры (только для ручного режима)
             if game_over and keys[pygame.K_r]:
                 # В ручном режиме R перезапускает игру
@@ -1228,7 +1415,7 @@ def main() -> None:
                 left_key_pressed = False
                 right_key_pressed = False
 
-            if not game_over:
+            if not game_over and not game_paused:
                 # Ручное управление платформой - плавное движение каждый кадр
                 if left_key_pressed:
                     paddle.move(-1)
@@ -1373,6 +1560,9 @@ def main() -> None:
                             # КРИТИЧНО: После бокового удара мяч потерян, но не устанавливаем vel_y = 0
                             # Вместо этого мяч будет обработан в логике потери жизни ниже
                             # КРИТИЧНО: Сбрасываем все трекеры после бокового удара
+                            # Ставим игру на паузу (сохраняем game_started = True для продолжения после паузы)
+                            game_paused = True
+                            ball.vel_y = 0
                         else:
                             game_over = True
                             game_time_seconds = int(time.time() - game_start_time)
@@ -1409,6 +1599,7 @@ def main() -> None:
                                 lives_left = MAX_LIVES
                                 game_over = False
                                 game_started = False
+                                game_paused = False
                                 # Перезапускаем отсчет времени игры
                                 game_start_time = time.time()
                                 # Устанавливаем флаг для пропуска обработки кадра
@@ -1578,6 +1769,8 @@ def main() -> None:
                         if lives_left > 0:
                             ball.reset(paddle.rect)
                             ball.vel_y = 0
+                            # Ставим игру на паузу (сохраняем game_started = True для продолжения после паузы)
+                            game_paused = True
                         else:
                             game_over = True
                             # Рассчитываем время игры и сохраняем результат
@@ -1615,6 +1808,7 @@ def main() -> None:
                                 lives_left = MAX_LIVES
                                 game_over = False
                                 game_started = False
+                                game_paused = False
                                 # Перезапускаем отсчет времени игры
                                 game_start_time = time.time()
                                 # Устанавливаем флаг для пропуска обработки кадра
@@ -1654,18 +1848,37 @@ def main() -> None:
                         game_over = True
                         game_time_seconds = int(time.time() - game_start_time)
                         
-                        # Показываем экран результатов
-                        sound_enabled, restart_game, exit_game = show_game_results(
-                            screen,
-                            font,
-                            big_font,
-                            score,
-                            player_name,
-                            game_time_seconds,
-                            highscore_manager,
-                            settings_manager,
-                            ball,
-                        )
+                        logger.info("=== ПОБЕДА! Все кирпичи уничтожены ===")
+                        
+                        # Используем trigger_instant_victory для показа анимации и результатов
+                        try:
+                            sound_enabled, restart_game, exit_game = trigger_instant_victory(
+                                screen,
+                                font,
+                                big_font,
+                                score,
+                                player_name,
+                                game_time_seconds,
+                                highscore_manager,
+                                settings_manager,
+                                ball,
+                            )
+                        except Exception as e:
+                            logger.error(f"Ошибка в trigger_instant_victory: {e}")
+                            import traceback
+                            logger.error(f"Трассировка ошибки:\n{traceback.format_exc()}")
+                            # В случае ошибки показываем только экран результатов
+                            sound_enabled, restart_game, exit_game = show_game_results(
+                                screen,
+                                font,
+                                big_font,
+                                score,
+                                player_name,
+                                game_time_seconds,
+                                highscore_manager,
+                                settings_manager,
+                                ball,
+                            )
 
                         # Если игрок хочет выйти из игры
                         if exit_game:
@@ -1686,6 +1899,7 @@ def main() -> None:
                             lives_left = MAX_LIVES
                             game_over = False
                             game_started = False
+                            game_paused = False
                             # Перезапускаем отсчет времени игры
                             game_start_time = time.time()
                             # Устанавливаем флаг для пропуска обработки кадра
@@ -1700,7 +1914,12 @@ def main() -> None:
                     if ball.rect.bottom >= SCREEN_HEIGHT:
                         # Мяч за границей экрана - уменьшаем жизни
                         lives_left -= 1
-                        if lives_left <= 0:
+                        if lives_left > 0:
+                            # Ставим игру на паузу (сохраняем game_started = True для продолжения после паузы)
+                            ball.reset(paddle.rect)
+                            ball.vel_y = 0
+                            game_paused = True
+                        elif lives_left <= 0:
                             game_over = True
                             # Рассчитываем время игры и сохраняем результат
                             game_time_seconds = int(time.time() - game_start_time)
@@ -1737,6 +1956,7 @@ def main() -> None:
                                 lives_left = MAX_LIVES
                                 game_over = False
                                 game_started = False
+                                game_paused = False
                                 # Перезапускаем отсчет времени игры
                                 game_start_time = time.time()
                                 # Устанавливаем флаг для пропуска обработки кадра
@@ -1789,8 +2009,11 @@ def main() -> None:
                 ball,
             )
 
-            if not game_started:
+            if not game_started and not game_paused:
                 draw_start_hint(screen, big_font)
+            
+            if game_paused:
+                draw_pause_hint(screen, big_font)
 
             pygame.display.flip()
             clock.tick(FPS)

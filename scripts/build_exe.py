@@ -15,12 +15,34 @@ scripts_dir = os.path.dirname(os.path.abspath(__file__))
 
 
 def get_current_version():
-    """Получает текущую версию из version.py"""
+    """
+    Получает текущую версию из version.py и обновляет её во всех файлах.
+    
+    ВАЖНО: Если установлена переменная окружения SKIP_VERSION_INCREMENT=1,
+    версия не увеличивается (используется при вызове из create_msi.py).
+    """
     try:
         sys.path.insert(0, project_root)
-        from src.game.version import get_version_string
-
-        return get_version_string()
+        from game.version import get_version_string, update_version_in_all_files
+        
+        # Проверяем, нужно ли пропустить увеличение версии
+        skip_increment = os.environ.get("SKIP_VERSION_INCREMENT") == "1"
+        
+        if skip_increment:
+            # Просто получаем текущую версию без увеличения
+            current_version = get_version_string()
+            print(f"📌 Используется версия: {current_version}")
+        else:
+            # Обновляем версию во всех файлах проекта
+            print("Обновляю версию проекта...")
+            if update_version_in_all_files():
+                current_version = get_version_string()
+                print(f"✅ Версия обновлена во всех файлах: {current_version}")
+            else:
+                print("⚠️  Не удалось обновить версию во всех файлах")
+                current_version = get_version_string()
+        
+        return current_version
     except Exception as e:
         print(f"Ошибка чтения версии из version.py: {e}")
         return "2.3.0000"
@@ -36,10 +58,15 @@ def build_executable():
         os.makedirs(build_dir, exist_ok=True)
 
         # Запускаем PyInstaller
+        icon_path = os.path.join(project_root, "resources", "icon.ico")
+        if not os.path.exists(icon_path):
+            print(f"Предупреждение: файл иконки {icon_path} не найден")
+        
         cmd = [
             "pyinstaller",
             "--onefile",
             "--windowed",
+            "--icon", icon_path,
             "--name",
             "Arkanoid_v" + get_current_version(),
             "--distpath",
@@ -49,35 +76,31 @@ def build_executable():
             "--specpath",
             build_dir,
             "--paths",
-            os.path.join(project_root, "src"),
+            project_root,
             "--add-data",
-            f'{os.path.join(project_root, "src", "resources", "audio")};src/resources/audio',
+            f'{os.path.join(project_root, "resources", "audio")};resources/audio',
             "--add-data",
-            f'{os.path.join(project_root, "src", "resources", "images")};src/resources/images',
+            f'{os.path.join(project_root, "resources", "images")};resources/images',
             "--add-data",
-            f'{os.path.join(project_root, "src", "resources", "data")};src/resources/data',
+            f'{os.path.join(project_root, "game", "data")};game/data',
             "--add-data",
-            f'{os.path.join(project_root, "src", "game", "highscores.py")};src/game',
-            "--add-data",
-            f'{os.path.join(project_root, "src", "game", "settings.py")};src/game',
-            "--add-data",
-            f'{os.path.join(project_root, "src", "resources")};src/resources',
+            f'{os.path.join(project_root, "resources")};resources',
             "--hidden-import",
             "pygame",
             "--hidden-import",
             "numpy",
             "--hidden-import",
-            "src.ai.ai_player",
+            "game.highscores",
             "--hidden-import",
-            "src.game.highscores",
+            "game.settings",
             "--hidden-import",
-            "src.game.settings",
+            "game.version",
             "--exclude-module",
             "tkinter",
             "--exclude-module",
             "matplotlib",
             "--clean",
-            os.path.join(project_root, "src", "game", "PyGameBall.py"),
+            os.path.join(project_root, "game", "PyGameBall.py"),
         ]
 
         result = subprocess.run(cmd, capture_output=True, text=True)
