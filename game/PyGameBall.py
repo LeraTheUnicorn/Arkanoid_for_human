@@ -2213,6 +2213,8 @@ def main() -> None:
                             old_ball_rect = ball.rect.copy()
                             # Ставим игру на паузу (сохраняем game_started = True для продолжения после паузы)
                             game_paused = True
+                            # Пропускаем остальную обработку кадра, чтобы сразу перейти в режим паузы
+                            continue
                         else:
                             game_over = True
                             # Рассчитываем время игры и сохраняем результат
@@ -2368,6 +2370,8 @@ def main() -> None:
                             # Обновляем отслеживание позиции
                             old_ball_rect = ball.rect.copy()
                             game_paused = True
+                            # Пропускаем остальную обработку кадра, чтобы сразу перейти в режим паузы
+                            continue
                         elif lives_left <= 0:
                             game_over = True
                             # Рассчитываем время игры и сохраняем результат
