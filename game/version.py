@@ -26,7 +26,7 @@ _VERSION_LOADED: bool = False
 # Начальные значения (будут обновлены при загрузке)
 VERSION_MAJOR: int = 2
 VERSION_MINOR: int = 3
-VERSION_BUILD = 169
+VERSION_BUILD = 170
 VERSION: str = f"{VERSION_MAJOR}.{VERSION_MINOR}.{VERSION_BUILD:04d}"
 VERSION_FULL: str = VERSION
 VERSION_BUILD_STRING: str = VERSION
@@ -96,7 +96,7 @@ def _load_version_from_file() -> None:
             # Обновляем файл с новой версией только если версия была увеличена
             if not skip_increment:
                 # ВАЖНО: Обновляем ВСЕ вхождения VERSION_BUILD в файле
-                # Поддерживаем оба формата: "VERSION_BUILD = 169" и "VERSION_BUILD = 169"
+                # Поддерживаем оба формата: "VERSION_BUILD = 170" и "VERSION_BUILD = 170"
                 content = re.sub(
                     r"VERSION_BUILD\s*:?\s*(?:int\s*)?=\s*\d+", f"VERSION_BUILD = {VERSION_BUILD}", content
                 )
