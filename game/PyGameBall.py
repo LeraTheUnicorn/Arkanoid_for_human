@@ -105,13 +105,21 @@ log_filepath = os.path.join(log_dir, log_filename)
 enable_console_logging = os.environ.get("ENABLE_CONSOLE_LOGGING", "1").lower() in ("1", "true", "yes")
 
 # Настраиваем обработчики логирования
-handlers: list[logging.Handler] = [logging.FileHandler(log_filepath, encoding='utf-8')]
+# Файл: DEBUG уровень (все логи сохраняются в файл)
+file_handler = logging.FileHandler(log_filepath, encoding='utf-8')
+file_handler.setLevel(logging.DEBUG)
+
+handlers: list[logging.Handler] = [file_handler]
+
+# Консоль: INFO уровень (DEBUG логи не выводятся в консоль)
 if enable_console_logging:
-    handlers.append(logging.StreamHandler())  # Вывод в консоль
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)  # DEBUG логи не показываются в консоли
+    handlers.append(console_handler)
 
 # Настраиваем логирование
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.DEBUG,  # Общий уровень DEBUG для всех обработчиков
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=handlers
 )
@@ -631,16 +639,16 @@ def show_victory_splash(screen: pygame.Surface, duration_seconds: float = 5.0) -
         screen: Поверхность pygame для отрисовки
         duration_seconds: Длительность показа заставки в секундах (по умолчанию 5)
     """
-    logger.info("=== НАЧАЛО ПОКАЗА АНИМАЦИИ ПОБЕДЫ ===")
-    logger.info(f"Длительность показа: {duration_seconds} секунд")
+    # logger.info("=== НАЧАЛО ПОКАЗА АНИМАЦИИ ПОБЕДЫ ===")
+    # logger.info(f"Длительность показа: {duration_seconds} секунд")
     
     # Загружаем изображение
     image_path = resource_path("images/d2.gif")
-    logger.info(f"Получен путь через resource_path: {image_path}")
+    # logger.info(f"Получен путь через resource_path: {image_path}")
     
     # Логируем путь для диагностики
-    logger.debug(f"Путь к анимации победы: {image_path}")
-    logger.debug(f"Файл существует: {os.path.exists(image_path)}")
+    # logger.debug(f"Путь к анимации победы: {image_path}")
+    # logger.debug(f"Файл существует: {os.path.exists(image_path)}")
     
     if not os.path.exists(image_path):
         logger.warning(f"Анимация не найдена по пути: {image_path}")
@@ -673,7 +681,7 @@ def show_victory_splash(screen: pygame.Surface, duration_seconds: float = 5.0) -
     try:
         # Используем PIL для загрузки и изменения размера GIF (НЕ МЕНЯЕМ размер окна!)
         try:
-            logger.debug(f"Пытаюсь загрузить анимацию через PIL: {image_path}")
+            # logger.debug(f"Пытаюсь загрузить анимацию через PIL: {image_path}")
             from PIL import Image, ImageSequence
             
             # Получаем размеры экрана (НЕ МЕНЯЕМ их!)
@@ -689,12 +697,12 @@ def show_victory_splash(screen: pygame.Surface, duration_seconds: float = 5.0) -
                 lanczos_filter: Any = getattr(Image, 'LANCZOS', 1)  # type: ignore[no-redef]  # 1 - это числовая константа LANCZOS
             
             # Загружаем GIF с помощью PIL
-            logger.debug(f"Открываю GIF файл: {image_path}")
+            # logger.debug(f"Открываю GIF файл: {image_path}")
             with Image.open(image_path) as im:
-                logger.debug(f"GIF открыт успешно. Формат: {im.format}, Размер: {im.size}, Режим: {im.mode}")
+                # logger.debug(f"GIF открыт успешно. Формат: {im.format}, Размер: {im.size}, Режим: {im.mode}")
                 # Получаем длительность кадров из метаданных
                 default_duration = im.info.get("duration", 100)
-                logger.debug(f"Длительность кадра по умолчанию: {default_duration} мс")
+                # logger.debug(f"Длительность кадра по умолчанию: {default_duration} мс")
                 
                 # Изменяем размер каждого кадра до размера экрана (800x600)
                 frames = []
@@ -705,7 +713,7 @@ def show_victory_splash(screen: pygame.Surface, duration_seconds: float = 5.0) -
                     frame_count += 1
                     # Копируем кадр и изменяем размер до размера экрана
                     resized_frame = frame.copy().resize((screen_width, screen_height), lanczos_filter)
-                    logger.debug(f"Обработан кадр {i+1}, размер: {resized_frame.size}")
+                    # logger.debug(f"Обработан кадр {i+1}, размер: {resized_frame.size}")
                     
                     # Получаем длительность кадра
                     duration = frame.info.get("duration", default_duration)
@@ -734,7 +742,7 @@ def show_victory_splash(screen: pygame.Surface, duration_seconds: float = 5.0) -
                     frames.append(frame_surface)
                     
             
-            logger.info(f"Загружено кадров анимации: {len(frames)}")
+            # logger.info(f"Загружено кадров анимации: {len(frames)}")
             if len(frames) == 0:
                 logger.error("Не удалось загрузить кадры анимации - список кадров пуст")
                 raise ValueError("Не удалось загрузить кадры анимации")
@@ -751,7 +759,7 @@ def show_victory_splash(screen: pygame.Surface, duration_seconds: float = 5.0) -
             frame_accumulator = 0.0
             last_frame_time = time.time()
             
-            logger.info(f"Начинаю показ анимации. Кадров: {len(frames)}, Длительность: {duration_seconds} сек")
+            # logger.info(f"Начинаю показ анимации. Кадров: {len(frames)}, Длительность: {duration_seconds} сек")
             
             # Показываем заставку в течение указанного времени
             
@@ -768,7 +776,7 @@ def show_victory_splash(screen: pygame.Surface, duration_seconds: float = 5.0) -
                     clock.tick(30)
             else:
                 # Анимация с несколькими кадрами
-                logger.debug(f"Показываю анимацию с {len(frames)} кадрами")
+                # logger.debug(f"Показываю анимацию с {len(frames)} кадрами")
                 while time.time() - start_time < duration_seconds:
                     # Обрабатываем события (чтобы окно не зависало)
                     for event in pygame.event.get():
@@ -811,7 +819,7 @@ def show_victory_splash(screen: pygame.Surface, duration_seconds: float = 5.0) -
                     # Ограничиваем FPS для плавной анимации
                     clock.tick(30)
                 
-                logger.info(f"Анимация показана успешно. Прошло времени: {time.time() - start_time:.2f} сек")
+                # logger.info(f"Анимация показана успешно. Прошло времени: {time.time() - start_time:.2f} сек")
                     
         except (ImportError, Exception) as e:
             # Если PIL не установлен или произошла ошибка, используем pygame для загрузки первого кадра
@@ -1055,6 +1063,146 @@ def draw_hud(
     )
     screen.blit(surf, (SCREEN_WIDTH - surf.get_width() - 20, 20))
 
+def draw_ball_trajectory(
+    screen: pygame.Surface,
+    ball: Ball,
+    paddle: Paddle,
+    max_steps: int = 500,
+) -> None:
+    """
+    Отрисовывает траекторию мяча в виде пунктирной зеленой линии.
+    
+    Args:
+        screen: Поверхность pygame для отрисовки
+        ball: Объект мяча
+        paddle: Объект платформы
+        max_steps: Максимальное количество шагов для расчета траектории
+    """
+    if ball.vel_x == 0 and ball.vel_y == 0:
+        return  # Мяч не движется, траектории нет
+    
+    ball_radius = BALL_SIZE // 2
+    trajectory_points = []
+    
+    # Начальная позиция мяча
+    x = float(ball.rect.centerx)
+    y = float(ball.rect.centery)
+    vel_x = float(ball.vel_x)
+    vel_y = float(ball.vel_y)
+    
+    # Границы экрана с учетом радиуса мяча
+    min_x = ball_radius
+    max_x = SCREEN_WIDTH - ball_radius
+    min_y = ball_radius
+    
+    # Добавляем начальную точку
+    trajectory_points.append((int(x), int(y)))
+    
+    for step in range(max_steps):
+        # Предсказываем следующую позицию
+        next_x = x + vel_x
+        next_y = y + vel_y
+        
+        # Проверяем столкновение со стенами
+        bounced = False
+        
+        # Столкновение с левой или правой стеной
+        if next_x < min_x:
+            # Отскок от левой стены
+            distance_to_wall = x - min_x
+            x = min_x
+            y = y + vel_y * (distance_to_wall / abs(vel_x)) if vel_x != 0 else y
+            vel_x = -vel_x
+            bounced = True
+        elif next_x > max_x:
+            # Отскок от правой стены
+            distance_to_wall = max_x - x
+            x = max_x
+            y = y + vel_y * (distance_to_wall / abs(vel_x)) if vel_x != 0 else y
+            vel_x = -vel_x
+            bounced = True
+        
+        # Столкновение с потолком
+        if next_y < min_y:
+            distance_to_ceiling = y - min_y
+            y = min_y
+            x = x + vel_x * (distance_to_ceiling / abs(vel_y)) if vel_y != 0 else x
+            vel_y = -vel_y
+            bounced = True
+        
+        # Проверяем столкновение с платформой
+        # Мяч движется вниз и находится в области платформы
+        if vel_y > 0 and next_y + ball_radius >= paddle.rect.top:
+            # Проверяем, попадает ли мяч в платформу по горизонтали
+            if paddle.rect.left <= next_x <= paddle.rect.right:
+                # Столкновение с платформой - останавливаем траекторию
+                # Рассчитываем точку столкновения
+                distance_to_paddle = (paddle.rect.top - ball_radius) - y
+                if distance_to_paddle > 0:
+                    x = x + vel_x * (distance_to_paddle / abs(vel_y)) if vel_y != 0 else x
+                    y = paddle.rect.top - ball_radius
+                    trajectory_points.append((int(x), int(y)))
+                break
+        
+        # Если не было отскока, просто обновляем позицию
+        if not bounced:
+            x = next_x
+            y = next_y
+        
+        # Проверяем выход за пределы экрана (мяч потерян)
+        if y > SCREEN_HEIGHT:
+            # Продолжаем траекторию немного дальше для визуализации
+            trajectory_points.append((int(x), int(y)))
+            break
+        
+        # Добавляем точку траектории
+        trajectory_points.append((int(x), int(y)))
+        
+        # Если мяч вышел за пределы экрана, прекращаем расчет
+        if x < 0 or x > SCREEN_WIDTH or y < 0:
+            break
+    
+    # Рисуем пунктирную зеленую линию
+    if len(trajectory_points) > 1:
+        green_color = (0, 255, 0)  # Зеленый цвет
+        dash_length = 5  # Длина сегмента пунктира
+        gap_length = 3   # Длина промежутка
+        
+        for i in range(len(trajectory_points) - 1):
+            start_point = trajectory_points[i]
+            end_point = trajectory_points[i + 1]
+            
+            # Вычисляем расстояние между точками
+            dx = end_point[0] - start_point[0]
+            dy = end_point[1] - start_point[1]
+            distance = ((dx ** 2) + (dy ** 2)) ** 0.5
+            
+            if distance > 0:
+                # Нормализуем направление
+                dx_norm = dx / distance
+                dy_norm = dy / distance
+                
+                # Рисуем пунктирную линию
+                current_distance = 0
+                draw_dash = True
+                
+                while current_distance < distance:
+                    if draw_dash:
+                        # Рисуем сегмент пунктира
+                        dash_end_distance = min(current_distance + dash_length, distance)
+                        dash_start = (
+                            int(start_point[0] + dx_norm * current_distance),
+                            int(start_point[1] + dy_norm * current_distance)
+                        )
+                        dash_end = (
+                            int(start_point[0] + dx_norm * dash_end_distance),
+                            int(start_point[1] + dy_norm * dash_end_distance)
+                        )
+                        pygame.draw.line(screen, green_color, dash_start, dash_end, 2)
+                    
+                    current_distance += (dash_length if draw_dash else gap_length)
+                    draw_dash = not draw_dash
+
 def render_colored_hint(
     screen: pygame.Surface,
     font: pygame.font.Font,
@@ -1186,6 +1334,8 @@ def main() -> None:
         game_over = False
         game_started = False
         game_paused = False
+        # Инициализируем отслеживание старой позиции мяча
+        old_ball_rect = ball.rect.copy()
 
         # Ввод имени игрока
         player_name, sound_enabled, exit_game = get_player_name(screen, font, big_font, highscore_manager)
@@ -1218,6 +1368,9 @@ def main() -> None:
         # Отслеживание состояния клавиш для плавного управления платформой
         left_key_pressed = False
         right_key_pressed = False
+        
+        # Отслеживание старой позиции мяча для предотвращения раздвоения при высокой скорости
+        old_ball_rect = None
 
         while running:
             
@@ -1381,6 +1534,8 @@ def main() -> None:
             
             # Позиционируем мяч на платформе если игра не запущена или на паузе
             if not game_started and not game_paused:
+                # Сохраняем старую позицию перед изменением
+                old_ball_rect = ball.rect.copy()
                 ball.rect.center = paddle.rect.midtop
                 ball.rect.y -= BALL_SIZE
                 # Игнорируем Enter при проверке старта игры (чтобы избежать случайного старта)
@@ -1394,6 +1549,8 @@ def main() -> None:
                     ball.vel_y = -ball.get_speed()
             elif game_paused:
                 # Во время паузы мяч должен быть на платформе
+                # Сохраняем старую позицию перед изменением
+                old_ball_rect = ball.rect.copy()
                 ball.rect.center = paddle.rect.midtop
                 ball.rect.y -= BALL_SIZE
             # Обработка перезапуска после окончания игры (только для ручного режима)
@@ -1417,12 +1574,38 @@ def main() -> None:
 
             if not game_over and not game_paused:
                 # Ручное управление платформой - плавное движение каждый кадр
+                paddle_pos_before = (paddle.rect.x, paddle.rect.centerx, paddle.rect.left, paddle.rect.right)
                 if left_key_pressed:
                     paddle.move(-1)
                 elif right_key_pressed:
                     paddle.move(1)
+                
+                # ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ: Движение платформы
+                if paddle_pos_before != (paddle.rect.x, paddle.rect.centerx, paddle.rect.left, paddle.rect.right):
+                    logger.debug(
+                        f"[PADDLE MOVEMENT] Платформа перемещена: "
+                        f"before=({paddle_pos_before[0]}, centerx={paddle_pos_before[1]}, "
+                        f"left={paddle_pos_before[2]}, right={paddle_pos_before[3]}), "
+                        f"after=({paddle.rect.x}, centerx={paddle.rect.centerx}, "
+                        f"left={paddle.rect.left}, right={paddle.rect.right}, "
+                        f"top={paddle.rect.top}, bottom={paddle.rect.bottom}, width={paddle.rect.width})"
+                    )
 
                 if game_started:
+                    # КРИТИЧНО: Сохраняем старую позицию мяча ПЕРЕД обновлением для предотвращения раздвоения
+                    old_ball_rect = ball.rect.copy()
+                    
+                    # ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ: Позиция мяча и платформы ПЕРЕД обновлением
+                    logger.debug(
+                        f"[BALL MOVEMENT] ПЕРЕД обновлением: "
+                        f"ball=({ball.rect.x}, {ball.rect.y}, centerx={ball.rect.centerx}, centery={ball.rect.centery}, "
+                        f"left={ball.rect.left}, right={ball.rect.right}, top={ball.rect.top}, bottom={ball.rect.bottom}), "
+                        f"vel=({ball.vel_x}, {ball.vel_y}), "
+                        f"paddle=({paddle.rect.x}, {paddle.rect.y}, centerx={paddle.rect.centerx}, "
+                        f"left={paddle.rect.left}, right={paddle.rect.right}, top={paddle.rect.top}, "
+                        f"bottom={paddle.rect.bottom}, width={paddle.rect.width})"
+                    )
+                    
                     # КРИТИЧНО: Проверяем отскок от потолка БЕЗ попадания в кубики ПЕРЕД обновлением мяча
                     # Это позволяет отследить отбитие в пустоту
                     ball_was_at_top = ball.rect.top <= 0 and ball.vel_y < 0
@@ -1437,6 +1620,28 @@ def main() -> None:
                             traceback.print_exc()
                         raise
                     
+                    # ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ: Позиция мяча ПОСЛЕ обновления
+                    logger.debug(
+                        f"[BALL MOVEMENT] ПОСЛЕ обновления: "
+                        f"ball=({ball.rect.x}, {ball.rect.y}, centerx={ball.rect.centerx}, centery={ball.rect.centery}, "
+                        f"left={ball.rect.left}, right={ball.rect.right}, top={ball.rect.top}, bottom={ball.rect.bottom}), "
+                        f"vel=({ball.vel_x}, {ball.vel_y})"
+                    )
+                    
+                    # ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ: Когда мяч приближается к платформе
+                    distance_to_paddle = ball.rect.bottom - paddle.rect.top
+                    if -50 <= distance_to_paddle <= 100 and ball.vel_y > 0:  # Мяч движется вниз и близко к платформе
+                        logger.debug(
+                            f"[BALL APPROACHING PADDLE] Мяч приближается к платформе: "
+                            f"distance_to_paddle_top={distance_to_paddle}, "
+                            f"ball=({ball.rect.x}, {ball.rect.y}, centerx={ball.rect.centerx}, centery={ball.rect.centery}, "
+                            f"left={ball.rect.left}, right={ball.rect.right}, top={ball.rect.top}, bottom={ball.rect.bottom}), "
+                            f"paddle=(centerx={paddle.rect.centerx}, left={paddle.rect.left}, right={paddle.rect.right}, "
+                            f"top={paddle.rect.top}, bottom={paddle.rect.bottom}, width={paddle.rect.width}), "
+                            f"vel=({ball.vel_x}, {ball.vel_y}), "
+                            f"ball_centerx_in_paddle_range={paddle.rect.left <= ball.rect.centerx <= paddle.rect.right}"
+                        )
+                    
                     # КРИТИЧНО: Проверяем, не попал ли мяч обратно в платформу после ball.update()
                     # Это может произойти, если мяч был установлен слишком близко к платформе
                     # НО: не обрабатываем, если мяч только что отскочил (предотвращаем ложные срабатывания)
@@ -1446,7 +1651,9 @@ def main() -> None:
                         ball._just_bounced = False
                     
                     if (ball.rect.colliderect(paddle.rect) and ball.vel_y > 0 and not just_bounced):
-                        logger.debug("[PADDLE COLLISION] Мяч попал обратно в платформу после update, исправляем позицию")
+                        # logger.debug("[PADDLE COLLISION] Мяч попал обратно в платформу после update, исправляем позицию")
+                        # Сохраняем старую позицию перед изменением
+                        old_ball_rect = ball.rect.copy()
                         # Мяч попал обратно в платформу - принудительно перемещаем его выше
                         ball_radius = BALL_SIZE // 2
                         min_distance = abs(ball.vel_y) + 15  # Скорость + запас
@@ -1487,6 +1694,18 @@ def main() -> None:
                         
                         # Логируем состояние для диагностики
                         collides = ball.rect.colliderect(paddle.rect)
+                        
+                        # ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ: Всегда логируем при проверке столкновения
+                        logger.debug(
+                            f"[COLLISION CHECK] Проверка столкновения: "
+                            f"collides={collides}, vel_y={ball.vel_y}, "
+                            f"ball=({ball.rect.x}, {ball.rect.y}, centerx={ball.rect.centerx}, centery={ball.rect.centery}, "
+                            f"left={ball.rect.left}, right={ball.rect.right}, top={ball.rect.top}, bottom={ball.rect.bottom}), "
+                            f"paddle=(centerx={paddle.rect.centerx}, left={paddle.rect.left}, right={paddle.rect.right}, "
+                            f"top={paddle.rect.top}, bottom={paddle.rect.bottom}, width={paddle.rect.width}), "
+                            f"just_bounced={just_bounced}"
+                        )
+                        
                         if collides and ball.vel_y > 0:
                             logger.debug(
                                 f"[PADDLE COLLISION] Мяч касается платформы: "
@@ -1510,107 +1729,205 @@ def main() -> None:
                                 and paddle.rect.left <= ball.rect.centerx <= paddle.rect.right  # Центр мяча в пределах платформы
                             )
                             
+                            # ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ: Проверка верхней поверхности
+                            logger.debug(
+                                f"[TOP SURFACE CHECK] Проверка верхней поверхности: "
+                                f"colliderect={ball.rect.colliderect(paddle.rect)}, vel_y={ball.vel_y}, "
+                                f"ball.centerx={ball.rect.centerx}, paddle.left={paddle.rect.left}, "
+                                f"paddle.right={paddle.rect.right}, "
+                                f"condition_left={paddle.rect.left <= ball.rect.centerx}, "
+                                f"condition_right={ball.rect.centerx <= paddle.rect.right}, "
+                                f"ball_hits_paddle_top={ball_hits_paddle_top}"
+                            )
+                            
                             if ball_hits_paddle_top:
                                 logger.debug("[PADDLE COLLISION] Определено столкновение с верхней поверхностью платформы")
                     except Exception as e:
                         logger.error(f"[ERROR] Ошибка в вычислении ball_hits_paddle_top: {e}", exc_info=True)
                         raise
                     
-                    # Проверяем боковое столкновение - это потеря мяча
-                    # Боковое столкновение: мяч касается платформы, но НЕ попадает в верхнюю поверхность
-                    # Это происходит, когда мяч касается левой или правой стороны платформы
+                    # УЛУЧШЕННАЯ ЛОГИКА БОКОВОГО СТОЛКНОВЕНИЯ
+                    # Боковое столкновение: мяч находится рядом с краем платформы и движется вниз
+                    # Определяем боковое столкновение даже когда мяч не пересекается с платформой,
+                    # но находится в зоне бокового удара (в пределах радиуса мяча от края платформы)
+                    ball_radius = BALL_SIZE // 2  # Определяем здесь, чтобы была доступна везде
+                    side_hit = None  # Инициализируем здесь, чтобы была доступна после блока try
                     try:
-                        ball_hits_paddle_side = (
+                        # Расстояние от центра мяча до краев платформы
+                        distance_to_left_edge = abs(ball.rect.centerx - paddle.rect.left)
+                        distance_to_right_edge = abs(ball.rect.centerx - paddle.rect.right)
+                        
+                        # Мяч находится в зоне бокового удара, если:
+                        # 1. Мяч движется вниз
+                        # 2. Мяч находится на уровне платформы (нижняя часть мяча близка к верхней части платформы)
+                        # 3. Центр мяча находится рядом с краем платформы (в пределах радиуса мяча + запас)
+                        # 4. Это НЕ верхняя поверхность
+                        ball_near_paddle_vertically = (
+                            ball.rect.bottom >= paddle.rect.top - ball_radius  # Мяч близко к верхней части платформы
+                            and ball.rect.top <= paddle.rect.bottom + ball_radius  # Или может быть немного ниже
+                        )
+                        
+                        # Проверяем левый край
+                        hits_left_edge = (
+                            ball.rect.centerx < paddle.rect.left  # Центр мяча слева от левого края
+                            and distance_to_left_edge <= ball_radius * 2  # В пределах зоны удара (2 радиуса)
+                            and ball_near_paddle_vertically
+                        )
+                        
+                        # Проверяем правый край
+                        hits_right_edge = (
+                            ball.rect.centerx > paddle.rect.right  # Центр мяча справа от правого края
+                            and distance_to_right_edge <= ball_radius * 2  # В пределах зоны удара (2 радиуса)
+                            and ball_near_paddle_vertically
+                        )
+                        
+                        # Также проверяем случай, когда мяч пересекается с платформой, но центр вне её
+                        collides_but_center_outside = (
                             ball.rect.colliderect(paddle.rect)
-                            and ball.vel_y > 0
+                            and not ball_hits_paddle_top
+                            and (ball.rect.centerx < paddle.rect.left or ball.rect.centerx > paddle.rect.right)
+                        )
+                        
+                        ball_hits_paddle_side = (
+                            ball.vel_y > 0  # Мяч движется вниз
                             and not ball_hits_paddle_top  # Не верхняя поверхность
-                            and (
-                                # Мяч касается левой стороны платформы (центр мяча слева от платформы)
-                                ball.rect.centerx < paddle.rect.left
-                                or
-                                # Мяч касается правой стороны платформы (центр мяча справа от платформы)
-                                ball.rect.centerx > paddle.rect.right
-                            )
+                            and (hits_left_edge or hits_right_edge or collides_but_center_outside)
+                        )
+                        
+                        # Определяем, какой именно край
+                        if ball_hits_paddle_side:
+                            if hits_left_edge or (collides_but_center_outside and ball.rect.centerx < paddle.rect.left):
+                                side_hit = "left"
+                            elif hits_right_edge or (collides_but_center_outside and ball.rect.centerx > paddle.rect.right):
+                                side_hit = "right"
+                        
+                        # ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ: Всегда логируем проверку бокового столкновения
+                        logger.debug(
+                            f"[SIDE COLLISION CHECK] Проверка бокового столкновения: "
+                            f"colliderect={ball.rect.colliderect(paddle.rect)}, vel_y={ball.vel_y}, "
+                            f"ball_hits_paddle_top={ball_hits_paddle_top}, "
+                            f"ball.centerx={ball.rect.centerx}, paddle.left={paddle.rect.left}, "
+                            f"paddle.right={paddle.rect.right}, "
+                            f"distance_to_left={distance_to_left_edge}, distance_to_right={distance_to_right_edge}, "
+                            f"hits_left_edge={hits_left_edge}, hits_right_edge={hits_right_edge}, "
+                            f"collides_but_center_outside={collides_but_center_outside}, "
+                            f"ball_near_paddle_vertically={ball_near_paddle_vertically}, "
+                            f"ball_hits_paddle_side={ball_hits_paddle_side}, side_hit={side_hit}, "
+                            f"ball=({ball.rect.x}, {ball.rect.y}, centerx={ball.rect.centerx}, centery={ball.rect.centery}, "
+                            f"left={ball.rect.left}, right={ball.rect.right}, top={ball.rect.top}, bottom={ball.rect.bottom}), "
+                            f"paddle=(centerx={paddle.rect.centerx}, left={paddle.rect.left}, right={paddle.rect.right}, "
+                            f"top={paddle.rect.top}, bottom={paddle.rect.bottom}, width={paddle.rect.width})"
                         )
                         
                         if ball_hits_paddle_side:
-                            logger.debug(
-                                f"[PADDLE COLLISION] Боковое столкновение! "
+                            logger.info(
+                                f"[PADDLE COLLISION] ✅ БОКОВОЕ СТОЛКНОВЕНИЕ ОБНАРУЖЕНО! Сторона: {side_hit} "
                                 f"ball.centerx={ball.rect.centerx}, paddle.left={paddle.rect.left}, "
-                                f"paddle.right={paddle.rect.right}"
+                                f"paddle.right={paddle.rect.right}, "
+                                f"ball=({ball.rect.x}, {ball.rect.y}, centerx={ball.rect.centerx}, centery={ball.rect.centery}, "
+                                f"left={ball.rect.left}, right={ball.rect.right}, top={ball.rect.top}, bottom={ball.rect.bottom}), "
+                                f"paddle=(centerx={paddle.rect.centerx}, left={paddle.rect.left}, right={paddle.rect.right}, "
+                                f"top={paddle.rect.top}, bottom={paddle.rect.bottom}, width={paddle.rect.width}), "
+                                f"vel=({ball.vel_x}, {ball.vel_y})"
                             )
                     except Exception as e:
                         logger.error(f"[ERROR] Ошибка в вычислении ball_hits_paddle_side: {e}", exc_info=True)
                         raise
                     
                     if ball_hits_paddle_side:
-                        # Мяч попал на боковую сторону платформы - это потеря мяча
-                        lives_left -= 1
-                        if lives_left > 0:
-                            # КРИТИЧНО: Правильно сбрасываем мяч после бокового удара
-                            # Сначала сбрасываем позицию и скорость
-                            ball.reset(paddle.rect)
-                            # КРИТИЧНО: Принудительно устанавливаем мяч ВЫШЕ платформы, чтобы избежать прилипания
-                            ball_radius = BALL_SIZE // 2
-                            ball.rect.centery = paddle.rect.top - ball_radius - 5  # Мяч должен быть минимум на 5 пикселей выше платформы
-                            # КРИТИЧНО: Убеждаемся, что мяч не находится внутри платформы
-                            if ball.rect.colliderect(paddle.rect):
-                                # Если мяч все еще внутри платформы, перемещаем его еще выше
-                                ball.rect.centery = paddle.rect.top - ball_radius - 15
-                            # КРИТИЧНО: После бокового удара мяч потерян, но не устанавливаем vel_y = 0
-                            # Вместо этого мяч будет обработан в логике потери жизни ниже
-                            # КРИТИЧНО: Сбрасываем все трекеры после бокового удара
-                            # Ставим игру на паузу (сохраняем game_started = True для продолжения после паузы)
-                            game_paused = True
-                            ball.vel_y = 0
-                        else:
-                            game_over = True
-                            game_time_seconds = int(time.time() - game_start_time)
-                            
-                            # Показываем экран результатов
-                            sound_enabled, restart_game, exit_game = show_game_results(
-                                screen,
-                                font,
-                                big_font,
-                                score,
-                                player_name,
-                                game_time_seconds,
-                                highscore_manager,
-                                settings_manager,
-                                ball,
-                            )
-
-                            # Если игрок хочет выйти из игры
-                            if exit_game:
-                                pygame.quit()
-                                return
-
-                            # Обработка перезапуска
-                            if restart_game:
-                                # Перезапускаем игру - ПОЛНЫЙ СБРОС СОСТОЯНИЯ
-                                paddle = Paddle()
-                                ball = Ball()
-                                ball_speed = settings_manager.get_ball_speed()
-                                ball.set_speed(ball_speed)
-                                ball.reset(paddle.rect)
-                                ball.vel_y = 0
-                                bricks = build_bricks()
-                                score = 0
-                                lives_left = MAX_LIVES
-                                game_over = False
-                                game_started = False
-                                game_paused = False
-                                # Перезапускаем отсчет времени игры
-                                game_start_time = time.time()
-                                # Устанавливаем флаг для пропуска обработки кадра
-                                skip_frame_processing = True
-                            else:
-                                # Выходим из игры
-                                running = False
-                                should_exit = True
-                                break
+                        # УЛУЧШЕННАЯ ОБРАБОТКА БОКОВОГО СТОЛКНОВЕНИЯ - ЕСТЕСТВЕННЫЙ ОТСКОК
+                        # Мяч отскакивает от боковой стороны платформы естественным образом
+                        logger.info(
+                            f"[PADDLE COLLISION] ✅ ОБРАБОТКА БОКОВОГО ОТСКОКА! Сторона: {side_hit} "
+                            f"КООРДИНАТЫ СТОЛКНОВЕНИЯ: "
+                            f"ball=({ball.rect.x}, {ball.rect.y}, centerx={ball.rect.centerx}, centery={ball.rect.centery}, "
+                            f"left={ball.rect.left}, right={ball.rect.right}, top={ball.rect.top}, bottom={ball.rect.bottom}), "
+                            f"paddle=(centerx={paddle.rect.centerx}, left={paddle.rect.left}, right={paddle.rect.right}, "
+                            f"top={paddle.rect.top}, bottom={paddle.rect.bottom}, width={paddle.rect.width}), "
+                            f"vel_before=({ball.vel_x}, {ball.vel_y})"
+                        )
                         
-                        continue  # Пропускаем проверку верхней поверхности после бокового удара
+                        # Вычисляем угол отскока в зависимости от того, насколько близко мяч к краю
+                        # Чем ближе к краю, тем более горизонтальным будет отскок
+                        # Чем дальше от края, тем более вертикальным будет отскок
+                        
+                        if side_hit == "left":
+                            # Удар о левый край - отскакиваем влево и вверх
+                            edge_x = paddle.rect.left
+                            distance_from_edge = abs(ball.rect.centerx - edge_x)
+                            # Нормализуем расстояние (0 = прямо на краю, 1 = на расстоянии 2*радиуса)
+                            normalized_distance = min(1.0, distance_from_edge / (ball_radius * 2))
+                            
+                            # Горизонтальная скорость: сильнее, если ближе к краю
+                            # Вертикальная скорость: всегда вверх, но может быть меньше, если очень близко к краю
+                            base_speed = ball.get_speed()
+                            
+                            # Горизонтальная скорость: направление влево, сила зависит от расстояния
+                            # Ближе к краю = больше горизонтальной скорости
+                            horizontal_factor = 0.7 + (1.0 - normalized_distance) * 0.3  # От 0.7 до 1.0
+                            ball.vel_x = -int(base_speed * horizontal_factor)
+                            
+                            # Вертикальная скорость: всегда вверх, но может быть меньше при очень близком ударе
+                            vertical_factor = 0.8 + normalized_distance * 0.2  # От 0.8 до 1.0
+                            ball.vel_y = -int(base_speed * vertical_factor)
+                            
+                        elif side_hit == "right":
+                            # Удар о правый край - отскакиваем вправо и вверх
+                            edge_x = paddle.rect.right
+                            distance_from_edge = abs(ball.rect.centerx - edge_x)
+                            # Нормализуем расстояние
+                            normalized_distance = min(1.0, distance_from_edge / (ball_radius * 2))
+                            
+                            base_speed = ball.get_speed()
+                            
+                            # Горизонтальная скорость: направление вправо
+                            horizontal_factor = 0.7 + (1.0 - normalized_distance) * 0.3  # От 0.7 до 1.0
+                            ball.vel_x = int(base_speed * horizontal_factor)
+                            
+                            # Вертикальная скорость: всегда вверх
+                            vertical_factor = 0.8 + normalized_distance * 0.2  # От 0.8 до 1.0
+                            ball.vel_y = -int(base_speed * vertical_factor)
+                        
+                        # КРИТИЧНО: Убеждаемся, что скорости не слишком малы
+                        min_speed = max(2, base_speed // 3)
+                        if abs(ball.vel_x) < min_speed:
+                            ball.vel_x = min_speed if ball.vel_x >= 0 else -min_speed
+                        if abs(ball.vel_y) < min_speed:
+                            ball.vel_y = -min_speed
+                        
+                        # КРИТИЧНО: Корректируем позицию мяча, чтобы он был выше платформы
+                        old_ball_rect = ball.rect.copy()
+                        
+                        # Перемещаем мяч выше платформы
+                        min_distance = abs(ball.vel_y) + 10  # Скорость + запас
+                        ball.rect.centery = paddle.rect.top - ball_radius - min_distance
+                        
+                        # Если мяч все еще пересекается с платформой, перемещаем его еще выше
+                        if ball.rect.colliderect(paddle.rect):
+                            ball.rect.centery = paddle.rect.top - ball_radius - (min_distance + 10)
+                        
+                        # Убеждаемся, что нижняя часть мяча выше верхней части платформы
+                        if ball.rect.bottom >= paddle.rect.top:
+                            ball.rect.centery = paddle.rect.top - ball_radius - (min_distance + 5)
+                        
+                        # Устанавливаем флаг отскока
+                        ball._just_bounced = True
+                        
+                        # ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ: После обработки бокового отскока
+                        logger.debug(
+                            f"[PADDLE COLLISION] После обработки бокового отскока: "
+                            f"ball=({ball.rect.x}, {ball.rect.y}, centerx={ball.rect.centerx}, centery={ball.rect.centery}, "
+                            f"left={ball.rect.left}, right={ball.rect.right}, top={ball.rect.top}, bottom={ball.rect.bottom}), "
+                            f"vel_after=({ball.vel_x}, {ball.vel_y}), "
+                            f"ball.bottom={ball.rect.bottom}, paddle.top={paddle.rect.top}, "
+                            f"distance_above_paddle={paddle.rect.top - ball.rect.bottom}"
+                        )
+                        
+                        # Play paddle bounce sound if sound is enabled
+                        if sound_enabled and paddle_bounce_sound:
+                            paddle_bounce_sound.play()
+                        
+                        continue  # Пропускаем проверку верхней поверхности после бокового отскока
                     
                     # КРИТИЧНО: Проверяем, что мяч не "прилип" к платформе
                     # Если мяч находится слишком близко к платформе и не движется вниз - это ошибка
@@ -1636,6 +1953,8 @@ def main() -> None:
                     
                     if ball_stuck:
                         # Мяч "прилип" к платформе - принудительно перемещаем его выше
+                        # Сохраняем старую позицию перед изменением
+                        old_ball_rect = ball.rect.copy()
                         ball_radius = BALL_SIZE // 2
                         # КРИТИЧНО: Перемещаем мяч ВЫШЕ платформы, используя centerx/centery для согласованности
                         ball.rect.centery = paddle.rect.top - ball_radius - 15  # Увеличиваем расстояние для надежности
@@ -1655,7 +1974,18 @@ def main() -> None:
                         continue  # Пропускаем обработку отскока, так как мяч уже перемещен
                     
                     if ball_hits_paddle_top:
-                        logger.debug("[PADDLE COLLISION] Обрабатываем отскок от верхней поверхности платформы")
+                        # ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ: Успешный отскок от верхней поверхности
+                        logger.info(
+                            f"[PADDLE COLLISION] ✅ ОТСКОК ОТ ВЕРХНЕЙ ПОВЕРХНОСТИ! "
+                            f"КООРДИНАТЫ СТОЛКНОВЕНИЯ: "
+                            f"ball=({ball.rect.x}, {ball.rect.y}, centerx={ball.rect.centerx}, centery={ball.rect.centery}, "
+                            f"left={ball.rect.left}, right={ball.rect.right}, top={ball.rect.top}, bottom={ball.rect.bottom}), "
+                            f"paddle=(centerx={paddle.rect.centerx}, left={paddle.rect.left}, right={paddle.rect.right}, "
+                            f"top={paddle.rect.top}, bottom={paddle.rect.bottom}, width={paddle.rect.width}), "
+                            f"vel_before=({ball.vel_x}, {ball.vel_y}), "
+                            f"ball.bottom={ball.rect.bottom}, paddle.top={paddle.rect.top}, "
+                            f"distance_to_paddle_top={ball.rect.bottom - paddle.rect.top}"
+                        )
                         # КРИТИЧНО: Сначала вычисляем и устанавливаем скорости, ПОТОМ корректируем позицию
                         # Это важно, чтобы мяч начал двигаться в правильном направлении ДО корректировки позиции
                         
@@ -1676,6 +2006,8 @@ def main() -> None:
                         ball.vel_x = int(offset * ball.get_speed())
                         
                         # ТЕПЕРЬ корректируем позицию мяча, чтобы он был выше платформы
+                        # Сохраняем старую позицию перед изменением
+                        old_ball_rect = ball.rect.copy()
                         # Используем centery для согласованности с методом update()
                         ball_radius = BALL_SIZE // 2
                         # КРИТИЧНО: Устанавливаем мяч достаточно далеко от платформы
@@ -1696,6 +2028,16 @@ def main() -> None:
                         # КРИТИЧНО: Устанавливаем флаг, что мяч только что отскочил
                         # Это предотвратит повторную обработку столкновения в следующем кадре
                         ball._just_bounced = True
+                        
+                        # ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ: Позиция мяча после корректировки при отскоке
+                        logger.debug(
+                            f"[PADDLE COLLISION] После корректировки позиции при отскоке: "
+                            f"ball=({ball.rect.x}, {ball.rect.y}, centerx={ball.rect.centerx}, centery={ball.rect.centery}, "
+                            f"left={ball.rect.left}, right={ball.rect.right}, top={ball.rect.top}, bottom={ball.rect.bottom}), "
+                            f"vel_after=({ball.vel_x}, {ball.vel_y}), "
+                            f"ball.bottom={ball.rect.bottom}, paddle.top={paddle.rect.top}, "
+                            f"distance_above_paddle={paddle.rect.top - ball.rect.bottom}"
+                        )
 
                         # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Предотвращение зацикливания
                         # Если offset слишком мал, принудительно устанавливаем значительное горизонтальное движение
@@ -1765,10 +2107,28 @@ def main() -> None:
                     # Если мяч ниже верхней границы платформы И не было столкновения - он потерян
                     if ball.rect.bottom > paddle.rect.top and not ball_hits_paddle_top:
                         # Мяч ниже верхней границы платформы и не отскочил - он потерян
+                        # ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ: Координаты в момент потери мяча
+                        logger.error(
+                            f"[BALL LOST - BELOW PADDLE] ⚠️ МЯЧ ПОТЕРЯН - НИЖЕ ПЛАТФОРМЫ! "
+                            f"КООРДИНАТЫ ПАДЕНИЯ: "
+                            f"ball=({ball.rect.x}, {ball.rect.y}, centerx={ball.rect.centerx}, centery={ball.rect.centery}, "
+                            f"left={ball.rect.left}, right={ball.rect.right}, top={ball.rect.top}, bottom={ball.rect.bottom}), "
+                            f"paddle=(centerx={paddle.rect.centerx}, left={paddle.rect.left}, right={paddle.rect.right}, "
+                            f"top={paddle.rect.top}, bottom={paddle.rect.bottom}, width={paddle.rect.width}), "
+                            f"vel=({ball.vel_x}, {ball.vel_y}), "
+                            f"ball.bottom={ball.rect.bottom}, paddle.top={paddle.rect.top}, "
+                            f"distance_below_paddle={ball.rect.bottom - paddle.rect.top}, "
+                            f"ball_hits_paddle_top={ball_hits_paddle_top}, "
+                            f"ball_hits_paddle_side={ball_hits_paddle_side if 'ball_hits_paddle_side' in locals() else 'N/A'}"
+                        )
                         lives_left -= 1
                         if lives_left > 0:
+                            # Сохраняем старую позицию перед сбросом
+                            old_ball_rect = ball.rect.copy()
                             ball.reset(paddle.rect)
                             ball.vel_y = 0
+                            # Обновляем отслеживание позиции
+                            old_ball_rect = ball.rect.copy()
                             # Ставим игру на паузу (сохраняем game_started = True для продолжения после паузы)
                             game_paused = True
                         else:
@@ -1915,9 +2275,13 @@ def main() -> None:
                         # Мяч за границей экрана - уменьшаем жизни
                         lives_left -= 1
                         if lives_left > 0:
+                            # Сохраняем старую позицию перед сбросом
+                            old_ball_rect = ball.rect.copy()
                             # Ставим игру на паузу (сохраняем game_started = True для продолжения после паузы)
                             ball.reset(paddle.rect)
                             ball.vel_y = 0
+                            # Обновляем отслеживание позиции
+                            old_ball_rect = ball.rect.copy()
                             game_paused = True
                         elif lives_left <= 0:
                             game_over = True
@@ -1999,6 +2363,22 @@ def main() -> None:
             pygame.draw.rect(
                 screen, (0, 0, 255), right_rect
             )  # Синий для отскока вправо
+            
+            # КРИТИЧНО: Явная очистка старой позиции мяча для предотвращения раздвоения при высокой скорости
+            # Это особенно важно при скорости 6+, когда мяч перемещается на большое расстояние за кадр
+            if old_ball_rect is not None and old_ball_rect != ball.rect:
+                # Очищаем старую позицию мяча с небольшим буфером для надежности
+                buffer = max(2, ball.get_speed())  # Буфер должен быть не меньше скорости мяча
+                clear_rect = old_ball_rect.inflate(buffer * 2, buffer * 2)
+                clear_rect.clamp_ip(pygame.Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT))
+                pygame.draw.rect(screen, (10, 10, 30), clear_rect)
+            
+            # Отрисовка траектории мяча (пунктирная зеленая линия)
+            # Показываем траекторию только когда игра запущена и мяч движется
+            if game_started and not game_paused and (ball.vel_x != 0 or ball.vel_y != 0):
+                draw_ball_trajectory(screen, ball, paddle)
+            
+            # Рисуем мяч в новой позиции
             pygame.draw.ellipse(screen, (230, 90, 90), ball.rect)
 
             draw_hud(
