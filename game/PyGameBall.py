@@ -1063,23 +1063,24 @@ def draw_hud(
     )
     screen.blit(surf, (SCREEN_WIDTH - surf.get_width() - 20, 20))
 
-def draw_ball_trajectory(
-    screen: pygame.Surface,
+def calculate_ball_trajectory(
     ball: Ball,
     paddle: Paddle,
     max_steps: int = 500,
-) -> None:
+) -> list:
     """
-    Отрисовывает траекторию мяча в виде пунктирной зеленой линии.
+    Вычисляет траекторию мяча и возвращает список точек.
     
     Args:
-        screen: Поверхность pygame для отрисовки
         ball: Объект мяча
         paddle: Объект платформы
         max_steps: Максимальное количество шагов для расчета траектории
+    
+    Returns:
+        Список точек траектории [(x, y), ...]
     """
     if ball.vel_x == 0 and ball.vel_y == 0:
-        return  # Мяч не движется, траектории нет
+        return []  # Мяч не движется, траектории нет
     
     ball_radius = BALL_SIZE // 2
     trajectory_points = []
@@ -1162,46 +1163,79 @@ def draw_ball_trajectory(
         if x < 0 or x > SCREEN_WIDTH or y < 0:
             break
     
-    # Рисуем пунктирную зеленую линию
-    if len(trajectory_points) > 1:
-        green_color = (0, 255, 0)  # Зеленый цвет
-        dash_length = 5  # Длина сегмента пунктира
-        gap_length = 3   # Длина промежутка
+    return trajectory_points
+
+
+def draw_trajectory_points(
+    screen: pygame.Surface,
+    trajectory_points: list,
+) -> None:
+    """
+    Отрисовывает траекторию по списку точек.
+    
+    Args:
+        screen: Поверхность pygame для отрисовки
+        trajectory_points: Список точек траектории [(x, y), ...]
+    """
+    if len(trajectory_points) <= 1:
+        return
+    
+    green_color = (0, 255, 0)  # Зеленый цвет
+    dash_length = 5  # Длина сегмента пунктира
+    gap_length = 3   # Длина промежутка
+    
+    for i in range(len(trajectory_points) - 1):
+        start_point = trajectory_points[i]
+        end_point = trajectory_points[i + 1]
         
-        for i in range(len(trajectory_points) - 1):
-            start_point = trajectory_points[i]
-            end_point = trajectory_points[i + 1]
+        # Вычисляем расстояние между точками
+        dx = end_point[0] - start_point[0]
+        dy = end_point[1] - start_point[1]
+        distance = ((dx ** 2) + (dy ** 2)) ** 0.5
+        
+        if distance > 0:
+            # Нормализуем направление
+            dx_norm = dx / distance
+            dy_norm = dy / distance
             
-            # Вычисляем расстояние между точками
-            dx = end_point[0] - start_point[0]
-            dy = end_point[1] - start_point[1]
-            distance = ((dx ** 2) + (dy ** 2)) ** 0.5
+            # Рисуем пунктирную линию
+            current_distance = 0
+            draw_segment = True
             
-            if distance > 0:
-                # Нормализуем направление
-                dx_norm = dx / distance
-                dy_norm = dy / distance
+            while current_distance < distance:
+                if draw_segment:
+                    # Рисуем сегмент
+                    segment_end = min(current_distance + dash_length, distance)
+                    start_x = int(start_point[0] + dx_norm * current_distance)
+                    start_y = int(start_point[1] + dy_norm * current_distance)
+                    end_x = int(start_point[0] + dx_norm * segment_end)
+                    end_y = int(start_point[1] + dy_norm * segment_end)
+                    pygame.draw.line(screen, green_color, (start_x, start_y), (end_x, end_y), 2)
+                    current_distance = segment_end
+                else:
+                    # Пропускаем промежуток
+                    current_distance += gap_length
                 
-                # Рисуем пунктирную линию
-                current_distance = 0
-                draw_dash = True
-                
-                while current_distance < distance:
-                    if draw_dash:
-                        # Рисуем сегмент пунктира
-                        dash_end_distance = min(current_distance + dash_length, distance)
-                        dash_start = (
-                            int(start_point[0] + dx_norm * current_distance),
-                            int(start_point[1] + dy_norm * current_distance)
-                        )
-                        dash_end = (
-                            int(start_point[0] + dx_norm * dash_end_distance),
-                            int(start_point[1] + dy_norm * dash_end_distance)
-                        )
-                        pygame.draw.line(screen, green_color, dash_start, dash_end, 2)
-                    
-                    current_distance += (dash_length if draw_dash else gap_length)
-                    draw_dash = not draw_dash
+                draw_segment = not draw_segment
+
+
+def draw_ball_trajectory(
+    screen: pygame.Surface,
+    ball: Ball,
+    paddle: Paddle,
+    max_steps: int = 500,
+) -> None:
+    """
+    Отрисовывает траекторию мяча в виде пунктирной зеленой линии.
+    
+    Args:
+        screen: Поверхность pygame для отрисовки
+        ball: Объект мяча
+        paddle: Объект платформы
+        max_steps: Максимальное количество шагов для расчета траектории
+    """
+    trajectory_points = calculate_ball_trajectory(ball, paddle, max_steps)
+    draw_trajectory_points(screen, trajectory_points)
 
 def render_colored_hint(
     screen: pygame.Surface,
@@ -1336,6 +1370,8 @@ def main() -> None:
         game_paused = False
         # Инициализируем отслеживание старой позиции мяча
         old_ball_rect = ball.rect.copy()
+        # Сохраненная траектория падения мяча (для отображения во время паузы)
+        saved_trajectory = []
 
         # Ввод имени игрока
         player_name, sound_enabled, exit_game = get_player_name(screen, font, big_font, highscore_manager)
@@ -1400,6 +1436,8 @@ def main() -> None:
                         # Выход из паузы при потере жизни - сразу продолжаем игру
                         if game_paused:
                             game_paused = False
+                            # Очищаем сохраненную траекторию при отмене паузы
+                            saved_trajectory = []
                             # Если игра была запущена, сразу запускаем мяч
                             if game_started:
                                 # Восстанавливаем скорость мяча в случайном направлении
@@ -2161,6 +2199,10 @@ def main() -> None:
                             f"ball_hits_paddle_top={ball_hits_paddle_top}, "
                             f"ball_hits_paddle_side={ball_hits_paddle_side if 'ball_hits_paddle_side' in locals() else 'N/A'}"
                         )
+                        
+                        # Сохраняем траекторию падения мяча перед сбросом
+                        saved_trajectory = calculate_ball_trajectory(ball, paddle)
+                        
                         lives_left -= 1
                         if lives_left > 0:
                             # Сохраняем старую позицию перед сбросом
@@ -2313,6 +2355,9 @@ def main() -> None:
 
                     if ball.rect.bottom >= SCREEN_HEIGHT:
                         # Мяч за границей экрана - уменьшаем жизни
+                        # Сохраняем траекторию падения мяча перед сбросом
+                        saved_trajectory = calculate_ball_trajectory(ball, paddle)
+                        
                         lives_left -= 1
                         if lives_left > 0:
                             # Сохраняем старую позицию перед сбросом
@@ -2414,9 +2459,14 @@ def main() -> None:
                 pygame.draw.rect(screen, (10, 10, 30), clear_rect)
             
             # Отрисовка траектории мяча (пунктирная зеленая линия)
-            # Показываем траекторию только когда игра запущена и мяч движется
+            # Показываем траекторию когда:
+            # 1. Игра запущена, не на паузе и мяч движется (обычная траектория)
+            # 2. Или во время паузы показываем сохраненную траекторию падения
             if game_started and not game_paused and (ball.vel_x != 0 or ball.vel_y != 0):
                 draw_ball_trajectory(screen, ball, paddle)
+            elif game_paused and saved_trajectory:
+                # Показываем сохраненную траекторию падения во время паузы
+                draw_trajectory_points(screen, saved_trajectory)
             
             # Рисуем мяч в новой позиции
             pygame.draw.ellipse(screen, (230, 90, 90), ball.rect)
