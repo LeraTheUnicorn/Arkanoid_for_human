@@ -1372,6 +1372,8 @@ def main() -> None:
         old_ball_rect = ball.rect.copy()
         # Сохраненная траектория падения мяча (для отображения во время паузы)
         saved_trajectory = []
+        # Флаг отображения траектории (по умолчанию включено)
+        show_trajectory = True
 
         # Ввод имени игрока
         player_name, sound_enabled, exit_game = get_player_name(screen, font, big_font, highscore_manager)
@@ -1449,6 +1451,11 @@ def main() -> None:
                     elif event.key == pygame.K_DOWN:
                         # Уменьшение скорости мяча (работает даже во время паузы)
                         ball.decrease_speed(settings_manager)
+                    elif event.key == pygame.K_5 or event.key == ord('5'):
+                        # Переключение отображения траектории мяча
+                        show_trajectory = not show_trajectory
+                        if not getattr(sys, "frozen", False):
+                            print(f"[TRAJECTORY] Отображение траектории: {'включено' if show_trajectory else 'выключено'}")
                     elif event.key == pygame.K_LEFT:
                         # Начало движения влево (не работает во время паузы)
                         if not game_paused:
@@ -2463,14 +2470,16 @@ def main() -> None:
                 pygame.draw.rect(screen, (10, 10, 30), clear_rect)
             
             # Отрисовка траектории мяча (пунктирная зеленая линия)
+            # Показываем траекторию только если она включена (клавиша 5)
             # Показываем траекторию когда:
             # 1. Игра запущена, не на паузе и мяч движется (обычная траектория)
             # 2. Или во время паузы показываем сохраненную траекторию падения
-            if game_started and not game_paused and (ball.vel_x != 0 or ball.vel_y != 0):
-                draw_ball_trajectory(screen, ball, paddle)
-            elif game_paused and saved_trajectory:
-                # Показываем сохраненную траекторию падения во время паузы
-                draw_trajectory_points(screen, saved_trajectory)
+            if show_trajectory:
+                if game_started and not game_paused and (ball.vel_x != 0 or ball.vel_y != 0):
+                    draw_ball_trajectory(screen, ball, paddle)
+                elif game_paused and saved_trajectory:
+                    # Показываем сохраненную траекторию падения во время паузы
+                    draw_trajectory_points(screen, saved_trajectory)
             
             # Рисуем мяч в новой позиции
             pygame.draw.ellipse(screen, (230, 90, 90), ball.rect)
