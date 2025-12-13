@@ -1387,14 +1387,29 @@ def main() -> None:
         old_ball_rect = ball.rect.copy()
         # Сохраненная траектория падения мяча (для отображения во время паузы)
         saved_trajectory = []
-        # Флаг отображения траектории (по умолчанию включено)
-        show_trajectory = True
+        # Флаг отображения траектории (по умолчанию выключено)
+        show_trajectory = False
 
         # Ввод имени игрока
         player_name, sound_enabled, exit_game = get_player_name(screen, font, big_font, highscore_manager)
         if exit_game:
             should_exit = True
             break  # Выходим из внешнего цикла
+        
+        # Проверяем настройки: если траектория включена в настройках, выключаем её
+        try:
+            settings = settings_manager.settings
+            visual_settings = settings.get("visual_settings", {})
+            if visual_settings.get("show_trajectory", False):
+                # Траектория включена в настройках - выключаем её
+                visual_settings["show_trajectory"] = False
+                settings["visual_settings"] = visual_settings
+                settings_manager.save_settings()
+                if not getattr(sys, "frozen", False):
+                    logger.debug("[SETTINGS] Траектория была включена в настройках, выключена при старте игры")
+        except Exception as e:
+            if not getattr(sys, "frozen", False):
+                logger.warning(f"[SETTINGS] Ошибка при проверке настроек траектории: {e}")
 
         lives_left = MAX_LIVES
 
