@@ -29,6 +29,7 @@ os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"  # Скрыть сообщени�
 
 import random
 import time
+import math
 import numpy as np
 from dataclasses import dataclass, field
 from typing import List, Tuple, Optional, Any
@@ -1078,6 +1079,50 @@ def draw_hud(
     )
     screen.blit(surf, (SCREEN_WIDTH - surf.get_width() - 20, 20))
 
+def calculate_paddle_bounce_velocity(
+    ball_x: float,
+    paddle: Paddle,
+    speed: int,
+) -> Tuple[int, int]:
+    """
+    Вычисляет скорость мяча после отскока от платформы с использованием угловой модели.
+    
+    Использует модель "веера" углов:
+    - Удар в центр (offset ≈ 0) даёт почти вертикальный полёт вверх
+    - Удар ближе к правому краю даёт более острый угол вправо
+    - Удар ближе к левому краю даёт более острый угол влево
+    
+    Args:
+        ball_x: X-координата центра мяча в момент столкновения
+        paddle: Объект платформы
+        speed: Скорость мяча
+    
+    Returns:
+        Кортеж (vel_x, vel_y) - компоненты скорости после отскока
+    """
+    # Вычисляем нормированное смещение от центра платформы [-1, 1]
+    paddle_center = paddle.rect.centerx
+    hit_offset = (ball_x - paddle_center) / (paddle.rect.width / 2)
+    
+    # Ограничиваем offset в диапазоне [-1, 1]
+    hit_offset = max(-1.0, min(1.0, hit_offset))
+    
+    # Преобразуем смещение в угол: угол = 90 - hitOffset * 60
+    # где 90° - строго вверх, 60° - максимальные наклонные углы
+    angle_degrees = 90 - hit_offset * 60
+    
+    # Преобразуем угол в радианы для тригонометрических функций
+    angle_radians = math.radians(angle_degrees)
+    
+    # Вычисляем компоненты скорости: vx = v * cos(угла), vy = v * sin(угла)
+    # В pygame: y увеличивается вниз, поэтому для движения вверх нужен отрицательный vy
+    vel_x = speed * math.cos(angle_radians)
+    vel_y = -speed * math.sin(angle_radians)  # Отрицательный для движения вверх
+    
+    # Округляем до целых значений
+    return (int(round(vel_x)), int(round(vel_y)))
+
+
 def calculate_ball_trajectory(
     ball: Ball,
     paddle: Paddle,
@@ -1151,14 +1196,30 @@ def calculate_ball_trajectory(
         if vel_y > 0 and next_y + ball_radius >= paddle.rect.top:
             # Проверяем, попадает ли мяч в платформу по горизонтали
             if paddle.rect.left <= next_x <= paddle.rect.right:
-                # Столкновение с платформой - останавливаем траекторию
-                # Рассчитываем точку столкновения
+                # Рассчитываем точку столкновения с верхом платформы
                 distance_to_paddle = (paddle.rect.top - ball_radius) - y
                 if distance_to_paddle > 0:
                     x = x + vel_x * (distance_to_paddle / abs(vel_y)) if vel_y != 0 else x
-                    y = paddle.rect.top - ball_radius
-                    trajectory_points.append((int(x), int(y)))
-                break
+                # Выравниваем мяч по верху платформы
+                y = paddle.rect.top - ball_radius
+                trajectory_points.append((int(x), int(y)))
+
+                # Эмулируем будущий отскок, чтобы продолжить траекторию после удара
+                # Используем угловую модель отскока для точного совпадения с реальным поведением
+                speed = ball.get_speed()
+                vel_x, vel_y = calculate_paddle_bounce_velocity(x, paddle, speed)
+                
+                # Защита от зацикливания при ударе точно в центр платформы (vel_x = 0)
+                # Используем детерминированное значение для согласованности траектории
+                if vel_x == 0:
+                    # При ударе точно в центр используем направление из текущего движения мяча
+                    # или минимальное значение в положительном направлении по умолчанию
+                    min_horizontal = 1
+                    vel_x = min_horizontal if ball.vel_x >= 0 else -min_horizontal
+
+                bounced = True
+                # Продолжаем симуляцию уже с новыми скоростями после отскока
+                continue
         
         # Если не было отскока, просто обновляем позицию
         if not bounced:
@@ -2092,21 +2153,15 @@ def main() -> None:
                         # КРИТИЧНО: Сначала вычисляем и устанавливаем скорости, ПОТОМ корректируем позицию
                         # Это важно, чтобы мяч начал двигаться в правильном направлении ДО корректировки позиции
                         
-                        # Вычисляем точное смещение от центра платформы
-                        paddle_center = paddle.rect.centerx
+                        # Используем угловую модель отскока для точного совпадения с расчетом траектории
+                        # Сохраняем оригинальное направление перед изменением скорости (для защиты от зацикливания)
+                        original_vel_x_before_bounce = ball.vel_x
+                        ball._original_vel_x_before_bounce = original_vel_x_before_bounce
+                        
+                        # Вычисляем скорость после отскока с использованием угловой модели
                         ball_center = ball.rect.centerx
-                        offset = (ball_center - paddle_center) / (paddle.rect.width / 2)
-
-                        # Ограничиваем offset в диапазоне [-1, 1]
-                        offset = max(-1.0, min(1.0, offset))
-
-                        # ✅ ДОБАВЛЕНО: Логирование фактической и предсказанной позиций при успешном отскоке
-                        # Устанавливаем новые скорости ПЕРВЫМ ДЕЛОМ
-                        ball.bounce_vertical()
-                        # КРИТИЧНО: Убеждаемся, что мяч движется вверх (vel_y < 0)
-                        if ball.vel_y >= 0:
-                            ball.vel_y = -ball.get_speed()
-                        ball.vel_x = int(offset * ball.get_speed())
+                        speed = ball.get_speed()
+                        ball.vel_x, ball.vel_y = calculate_paddle_bounce_velocity(ball_center, paddle, speed)
                         
                         # ТЕПЕРЬ корректируем позицию мяча, чтобы он был выше платформы
                         # Сохраняем старую позицию перед изменением
@@ -2142,37 +2197,14 @@ def main() -> None:
                             f"distance_above_paddle={paddle.rect.top - ball.rect.bottom}"
                         )
 
-                        # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Предотвращение зацикливания
-                        # Если offset слишком мал, принудительно устанавливаем значительное горизонтальное движение
-                        min_horizontal_speed = max(
-                            2, ball.get_speed() // 2
-                        )  # Минимум 2 пикселя или половина скорости
-                        if abs(ball.vel_x) < min_horizontal_speed:
-                            # Принудительно устанавливаем направление в сторону от текущего положения
-                            if ball.rect.centerx < SCREEN_WIDTH // 2:
-                                ball.vel_x = min_horizontal_speed  # Двигаемся вправо
-                            else:
-                                ball.vel_x = -min_horizontal_speed  # Двигаемся влево
-
-                            # Добавляем небольшую случайность для разнообразия
-                            ball.vel_x += random.choice([-1, 0, 1])
-
-                        # Дополнительная защита от зацикливания - проверяем, не была ли предыдущая скорость слишком малой
-                        # Если предыдущая горизонтальная скорость была очень малой, а новая тоже
-                        if abs(ball._last_vel_x) <= 1 and abs(ball.vel_x) <= 1:
-                            # Принудительно меняем направление
-                            ball.vel_x = random.choice(
-                                [-min_horizontal_speed, min_horizontal_speed]
-                            )
-
-                        # Сохраняем текущую скорость для следующей проверки
-                        ball._last_vel_x = ball.vel_x
-
-                        # Ограничиваем горизонтальную скорость (но оставляем место для мин. скорости)
-                        max_horizontal = ball.get_speed()
-                        ball.vel_x = max(
-                            -max_horizontal, min(max_horizontal, ball.vel_x)
-                        )
+                        # Защита от зацикливания при ударе точно в центр платформы (vel_x = 0)
+                        # При ударе в центр угловая модель дает vel_x = 0, что может вызвать зацикливание
+                        # Добавляем минимальное горизонтальное движение для предотвращения зацикливания
+                        # Используем ту же логику, что и в расчете траектории для согласованности
+                        if ball.vel_x == 0:
+                            # При ударе точно в центр используем направление из оригинального движения мяча
+                            min_horizontal = 1
+                            ball.vel_x = min_horizontal if original_vel_x_before_bounce >= 0 else -min_horizontal
                         
                         # КРИТИЧНО: Финальная проверка - убеждаемся, что мяч находится выше платформы и движется вверх
                         # Проверяем несколько раз, чтобы гарантировать, что мяч не пересекается с платформой

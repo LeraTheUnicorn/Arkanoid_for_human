@@ -129,17 +129,82 @@ class Ball:
         speed: int,
         settings_manager: Optional[SettingsManager] = None,
     ) -> None:
-        """Устанавливает скорость мяча и обновляет настройки."""
+        """
+        Устанавливает скорость мяча и обновляет настройки.
+        КРИТИЧНО: Сохраняет направление движения (угол траектории) при изменении скорости.
+        """
         max_speed: int = 10
         if 1 <= speed <= max_speed:
             old_speed: int = self.current_speed
             self.current_speed = speed
-            self.vel_x = (
-                int(self.vel_x * speed / old_speed) if old_speed != 0 else speed
-            )
-            self.vel_y = (
-                int(self.vel_y * speed / old_speed) if old_speed != 0 else -speed
-            )
+            
+            # КРИТИЧНО: Сохраняем направление движения (угол траектории)
+            # Вычисляем текущую длину вектора скорости (модуль)
+            current_speed_magnitude = ((self.vel_x ** 2) + (self.vel_y ** 2)) ** 0.5
+            
+            if current_speed_magnitude > 0:
+                # Мяч движется - сохраняем направление, меняем только модуль скорости
+                # Нормализуем вектор скорости (приводим к единичной длине)
+                normalized_vel_x = self.vel_x / current_speed_magnitude
+                normalized_vel_y = self.vel_y / current_speed_magnitude
+                
+                # Применяем новую скорость, сохраняя направление
+                # Используем более точное вычисление для сохранения пропорций
+                # Сначала вычисляем с плавающей точкой
+                new_vel_x_float = normalized_vel_x * speed
+                new_vel_y_float = normalized_vel_y * speed
+                
+                # Округляем до ближайшего целого
+                new_vel_x = round(new_vel_x_float)
+                new_vel_y = round(new_vel_y_float)
+                
+                # КРИТИЧНО: Гарантируем сохранение направления при малых скоростях
+                # Если после округления одна из компонент стала 0, но должна быть ненулевой
+                # Используем порог 0.1 для определения значимости компоненты
+                if new_vel_x == 0 and abs(normalized_vel_x) > 0.1:
+                    # Восстанавливаем минимальное значение с сохранением знака
+                    new_vel_x = 1 if normalized_vel_x > 0 else -1
+                if new_vel_y == 0 and abs(normalized_vel_y) > 0.1:
+                    # Восстанавливаем минимальное значение с сохранением знака
+                    new_vel_y = 1 if normalized_vel_y > 0 else -1
+                
+                # КРИТИЧНО: Проверяем, что обе компоненты не стали нулевыми одновременно
+                if new_vel_x == 0 and new_vel_y == 0:
+                    # Если обе компоненты нулевые, используем направление из нормализованного вектора
+                    # Выбираем компоненту с большей абсолютной величиной
+                    if abs(normalized_vel_x) > abs(normalized_vel_y):
+                        new_vel_x = speed if normalized_vel_x > 0 else -speed
+                        new_vel_y = round(normalized_vel_y * speed)
+                        if new_vel_y == 0:
+                            new_vel_y = 1 if normalized_vel_y > 0 else -1
+                    else:
+                        new_vel_x = round(normalized_vel_x * speed)
+                        if new_vel_x == 0:
+                            new_vel_x = 1 if normalized_vel_x > 0 else -1
+                        new_vel_y = speed if normalized_vel_y > 0 else -speed
+                
+                # Применяем новые значения
+                self.vel_x = new_vel_x
+                self.vel_y = new_vel_y
+                
+                # КРИТИЧНО: Нормализуем результирующий вектор к заданной скорости
+                # для точного сохранения направления и предотвращения искажений
+                result_magnitude = ((self.vel_x ** 2) + (self.vel_y ** 2)) ** 0.5
+                if result_magnitude > 0:
+                    # Масштабируем к нужной скорости, сохраняя направление
+                    scale_factor = speed / result_magnitude
+                    self.vel_x = round(self.vel_x * scale_factor)
+                    self.vel_y = round(self.vel_y * scale_factor)
+                    
+                    # Финальная проверка: гарантируем, что направление сохранено
+                    if self.vel_x == 0 and abs(normalized_vel_x) > 0.1:
+                        self.vel_x = 1 if normalized_vel_x > 0 else -1
+                    if self.vel_y == 0 and abs(normalized_vel_y) > 0.1:
+                        self.vel_y = 1 if normalized_vel_y > 0 else -1
+            else:
+                # Мяч неподвижен - используем значения по умолчанию
+                self.vel_x = random.choice([-speed, speed])
+                self.vel_y = -speed
 
             if settings_manager:
                 settings_manager.set_ball_speed(speed)
