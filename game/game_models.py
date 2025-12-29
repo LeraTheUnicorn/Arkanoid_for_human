@@ -34,6 +34,8 @@ class Paddle:
             PADDLE_HEIGHT,
         )
     )
+    # Горизонтальная скорость платформы (пикселей за кадр)
+    vel_x: int = 0
 
     def move(self, direction: int) -> None:
         """
@@ -42,6 +44,8 @@ class Paddle:
         Args:
             direction: -1 (влево) или 1 (вправо)
         """
+        # Сохраняем скорость платформы для расчёта отскока мяча
+        self.vel_x = direction * PADDLE_SPEED
         self.rect.x += direction * PADDLE_SPEED
         paddle_half_width: int = PADDLE_WIDTH // 2
         min_center_x: int = paddle_half_width

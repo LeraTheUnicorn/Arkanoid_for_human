@@ -447,6 +447,14 @@ def get_player_name(
             (SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT // 2 + 110),
         )
 
+        # Подсказка о паузе
+        render_colored_hint(
+            screen,
+            font,
+            "Нажмите Space для паузы",
+            (SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT // 2 + 140),
+        )
+
         pygame.display.flip()
 
     # ФИНАЛЬНАЯ ВАЛИДАЦИЯ: убеждаемся, что имя корректно
@@ -1080,8 +1088,11 @@ def draw_hud(
     screen.blit(surf, (SCREEN_WIDTH - surf.get_width() - 20, 20))
 
 def calculate_paddle_bounce_velocity(
+    ball_vel_x: float,
+    ball_vel_y: float,
     ball_x: float,
     paddle: Paddle,
+    paddle_vel_x: float,
     speed: int,
 ) -> Tuple[int, int]:
     """
@@ -1100,27 +1111,94 @@ def calculate_paddle_bounce_velocity(
     Returns:
         Кортеж (vel_x, vel_y) - компоненты скорости после отскока
     """
-    # Вычисляем нормированное смещение от центра платформы [-1, 1]
-    paddle_center = paddle.rect.centerx
-    hit_offset = (ball_x - paddle_center) / (paddle.rect.width / 2)
-    
-    # Ограничиваем offset в диапазоне [-1, 1]
+    # 1. Базовый физический отскок в векторной форме:
+    # отражаем вертикальную компоненту скорости.
+    incoming_vx = float(ball_vel_x)
+    incoming_vy = float(ball_vel_y)
+    phys_vx = incoming_vx
+    phys_vy = -incoming_vy
+
+    # Если по каким-то причинам вертикальная скорость нулевая,
+    # считаем, что мяч летит вертикально вниз.
+    if phys_vy == 0 and incoming_vx == 0:
+        phys_vy = -float(speed)
+
+    # 2. Влияние позиции удара по платформе (веерная модель).
+    paddle_center = float(paddle.rect.centerx)
+    half_width = float(paddle.rect.width) / 2.0 if paddle.rect.width > 0 else 1.0
+    hit_offset = (float(ball_x) - paddle_center) / half_width  # [-1, 1]
     hit_offset = max(-1.0, min(1.0, hit_offset))
+
+    # Веерный целевой вектор:
+    # offset=-1 -> угол 150° (сильно влево-вверх)
+    # offset= 0 -> угол  90° (строго вверх)
+    # offset=+1 -> угол  30° (сильно вправо-вверх)
+    fan_angle_deg = 90.0 - hit_offset * 60.0
+    fan_rad = math.radians(fan_angle_deg)
+    fan_vx = math.cos(fan_rad)
+    fan_vy = math.sin(fan_rad)  # в математической системе (ось Y вверх)
+
+    # Переводим целевой вектор в систему pygame (ось Y вниз)
+    fan_vx_pg = fan_vx
+    fan_vy_pg = -fan_vy
+
+    # Смесь физического и веерного векторов.
+    # В центре (offset≈0) почти чистая физика,
+    # на краях (|offset|≈1) доминирует веер.
+    blend_strength = abs(hit_offset)  # 0..1
     
-    # Преобразуем смещение в угол: угол = 90 - hitOffset * 60
-    # где 90° - строго вверх, 60° - максимальные наклонные углы
-    angle_degrees = 90 - hit_offset * 60
+    # Нормализуем физический вектор к единичной длине для корректного смешивания
+    phys_length = math.hypot(phys_vx, phys_vy)
+    if phys_length > 0:
+        phys_vx_norm = phys_vx / phys_length
+        phys_vy_norm = phys_vy / phys_length
+    else:
+        phys_vx_norm = 0.0
+        phys_vy_norm = -1.0  # строго вверх
     
-    # Преобразуем угол в радианы для тригонометрических функций
-    angle_radians = math.radians(angle_degrees)
+    # Смешиваем нормализованные векторы
+    mix_vx_norm = (1.0 - blend_strength) * phys_vx_norm + blend_strength * fan_vx_pg
+    mix_vy_norm = (1.0 - blend_strength) * phys_vy_norm + blend_strength * fan_vy_pg
     
-    # Вычисляем компоненты скорости: vx = v * cos(угла), vy = v * sin(угла)
-    # В pygame: y увеличивается вниз, поэтому для движения вверх нужен отрицательный vy
-    vel_x = speed * math.cos(angle_radians)
-    vel_y = -speed * math.sin(angle_radians)  # Отрицательный для движения вверх
+    # Нормализуем смешанный вектор
+    mix_length = math.hypot(mix_vx_norm, mix_vy_norm)
+    if mix_length > 0:
+        mix_vx_norm /= mix_length
+        mix_vy_norm /= mix_length
     
-    # Округляем до целых значений
-    return (int(round(vel_x)), int(round(vel_y)))
+    # Применяем скорость мяча к нормализованному вектору
+    vx = mix_vx_norm * float(speed)
+    vy = mix_vy_norm * float(speed)
+
+    # 3. Добавочная скорость от движения платформы.
+    # Если платформа стоит, вклад 0. Если движется, добавляем долю скорости.
+    vx_extra = float(paddle_vel_x) * 0.2
+    vx += vx_extra
+
+    # Финальная нормализация с учётом добавленной скорости платформы
+    length = math.hypot(vx, vy)
+    if length == 0:
+        # Защита от нулевого вектора: отправляем мяч строго вверх.
+        vx, vy = 0.0, -float(speed)
+        length = float(speed)
+
+    scale = float(speed) / length
+    vx *= scale
+    vy *= scale
+
+    vel_x = int(round(vx))
+    vel_y = int(round(vy))
+
+    # Гарантируем, что мяч всегда летит вверх после отскока
+    if vel_y >= 0:
+        vel_y = -max(1, abs(vel_y))
+
+    # Не даём полностью обнулить горизонтальную скорость,
+    # чтобы избежать строго вертикального "залипания".
+    if vel_x == 0 and abs(hit_offset) > 0.05:
+        vel_x = 1 if hit_offset > 0 else -1
+
+    return (vel_x, vel_y)
 
 
 def calculate_ball_trajectory(
@@ -1204,10 +1282,24 @@ def calculate_ball_trajectory(
                 y = paddle.rect.top - ball_radius
                 trajectory_points.append((int(x), int(y)))
 
-                # Эмулируем будущий отскок, чтобы продолжить траекторию после удара
-                # Используем угловую модель отскока для точного совпадения с реальным поведением
+                # Эмулируем будущий отскок, чтобы продолжить траекторию после удара.
+                # Используем ту же физическую модель, что и в реальной игре:
+                # - угол отражения зависит от угла падения
+                # - учитываем позицию удара по платформе
+                # - добавляем вклад скорости платформы
                 speed = ball.get_speed()
-                vel_x, vel_y = calculate_paddle_bounce_velocity(x, paddle, speed)
+                # В расчёте траектории платформа считается неподвижной
+                paddle_vel_x = 0
+                # hit_x: используем ТЕКУЩУЮ координату центра мяча В МОМЕНТ столкновения
+                hit_x = x  # x уже скорректирован до точки касания
+                vel_x, vel_y = calculate_paddle_bounce_velocity(
+                    vel_x,
+                    vel_y,
+                    hit_x,
+                    paddle,
+                    paddle_vel_x,
+                    speed,
+                )
                 
                 # Защита от зацикливания при ударе точно в центр платформы (vel_x = 0)
                 # Используем детерминированное значение для согласованности траектории
@@ -1324,7 +1416,7 @@ def render_colored_hint(
     """Отображает подсказку с выделенными ключевыми словами цветом"""
     words = text.split()
     x, y = pos
-    key_words = ["Enter", "H", "M", "ESC", "↑", "↓", "5"]
+    key_words = ["Enter", "H", "M", "ESC", "↑", "↓", "5", "Space"]
 
     for word in words:
         # Убираем знаки препинания для сравнения
@@ -1526,16 +1618,20 @@ def main() -> None:
                             pygame.mixer.music.play(-1)
                             sound_enabled = True
                     elif event.key == pygame.K_SPACE:
-                        # Выход из паузы при потере жизни - сразу продолжаем игру
+                        # Обработка SPACE в зависимости от состояния игры
                         if game_paused:
+                            # Снимаем с паузы - игра продолжается
                             game_paused = False
                             # Очищаем сохраненную траекторию при отмене паузы
                             saved_trajectory = []
-                            # Если игра была запущена, сразу запускаем мяч
-                            if game_started:
-                                # Восстанавливаем скорость мяча в случайном направлении
-                                ball.vel_x = random.choice([-ball.get_speed(), ball.get_speed()])
-                                ball.vel_y = -ball.get_speed()
+                        elif not game_started and lives_left > 0:
+                            # После потери жизни - запускаем игру (как при нажатии стрелок)
+                            game_started = True
+                            ball.vel_x = random.choice([-ball.get_speed(), ball.get_speed()])
+                            ball.vel_y = -ball.get_speed()
+                        elif game_started and not game_paused:
+                            # Во время игры - ставим на паузу
+                            game_paused = True
                     elif event.key == pygame.K_UP:
                         # Увеличение скорости мяча (работает даже во время паузы)
                         ball.increase_speed(settings_manager)
@@ -1549,16 +1645,14 @@ def main() -> None:
                             print(f"[TRAJECTORY] Отображение траектории: {'включено' if show_trajectory else 'выключено'}")
                     elif event.key == pygame.K_LEFT:
                         # Начало движения влево (не работает во время паузы)
-                        if not game_paused:
-                            left_key_pressed = True
-                            if not game_over:
-                                paddle.move(-1)
+                        left_key_pressed = True
+                        if not game_over:
+                            paddle.move(-1)
                     elif event.key == pygame.K_RIGHT:
                         # Начало движения вправо (не работает во время паузы)
-                        if not game_paused:
-                            right_key_pressed = True
-                            if not game_over:
-                                paddle.move(1)
+                        right_key_pressed = True
+                        if not game_over:
+                            paddle.move(1)
                     elif event.key == pygame.K_1 or event.key == ord('1'):
                         # Обработка тройного нажатия "1" для немедленной победы
                         current_time = time.time()
@@ -1668,7 +1762,7 @@ def main() -> None:
             
             keys = pygame.key.get_pressed()
             
-            # Позиционируем мяч на платформе если игра не запущена или на паузе
+            # Позиционируем мяч на платформе только если игра не запущена (чтобы при паузе ничего не сбрасывалось)
             if not game_started and not game_paused:
                 # Сохраняем старую позицию перед изменением
                 old_ball_rect = ball.rect.copy()
@@ -1683,12 +1777,6 @@ def main() -> None:
                     game_started = True
                     ball.vel_x = ball.get_speed()
                     ball.vel_y = -ball.get_speed()
-            elif game_paused:
-                # Во время паузы мяч должен быть на платформе
-                # Сохраняем старую позицию перед изменением
-                old_ball_rect = ball.rect.copy()
-                ball.rect.center = paddle.rect.midtop
-                ball.rect.y -= BALL_SIZE
             # Обработка перезапуска после окончания игры (только для ручного режима)
             if game_over and keys[pygame.K_r]:
                 # В ручном режиме R перезапускает игру
@@ -1711,6 +1799,11 @@ def main() -> None:
             if not game_over and not game_paused:
                 # Ручное управление платформой - плавное движение каждый кадр
                 paddle_pos_before = (paddle.rect.x, paddle.rect.centerx, paddle.rect.left, paddle.rect.right)
+
+                # По умолчанию считаем, что платформа в этом кадре не движется
+                if hasattr(paddle, "vel_x"):
+                    paddle.vel_x = 0
+
                 if left_key_pressed:
                     paddle.move(-1)
                 elif right_key_pressed:
@@ -1727,7 +1820,7 @@ def main() -> None:
                         f"top={paddle.rect.top}, bottom={paddle.rect.bottom}, width={paddle.rect.width})"
                     )
 
-                if game_started:
+                if game_started and not game_paused:
                     # КРИТИЧНО: Сохраняем старую позицию мяча ПЕРЕД обновлением для предотвращения раздвоения
                     old_ball_rect = ball.rect.copy()
                     
@@ -1802,7 +1895,7 @@ def main() -> None:
                     
                     # КРИТИЧНО: Защита от vel_y == 0 во время игры (кроме начального состояния)
                     # Если мяч не двигается по вертикали и игра запущена - это ошибка
-                    if game_started and ball.vel_y == 0:
+                    if game_started and not game_paused and ball.vel_y == 0:
                         # Мяч застрял с нулевой скоростью - принудительно запускаем его
                         ball.vel_y = -ball.get_speed()
                         # Логируем для диагностики
@@ -2158,10 +2251,21 @@ def main() -> None:
                         original_vel_x_before_bounce = ball.vel_x
                         ball._original_vel_x_before_bounce = original_vel_x_before_bounce
                         
-                        # Вычисляем скорость после отскока с использованием угловой модели
+                        # Вычисляем скорость после отскока с использованием физической модели:
+                        # - угол отражения зависит от угла падения
+                        # - учитываем позицию удара по платформе
+                        # - добавляем вклад скорости платформы
                         ball_center = ball.rect.centerx
                         speed = ball.get_speed()
-                        ball.vel_x, ball.vel_y = calculate_paddle_bounce_velocity(ball_center, paddle, speed)
+                        paddle_vel_x = getattr(paddle, "vel_x", 0)
+                        ball.vel_x, ball.vel_y = calculate_paddle_bounce_velocity(
+                            ball.vel_x,
+                            ball.vel_y,
+                            ball_center,
+                            paddle,
+                            paddle_vel_x,
+                            speed,
+                        )
                         
                         # ТЕПЕРЬ корректируем позицию мяча, чтобы он был выше платформы
                         # Сохраняем старую позицию перед изменением
@@ -2288,9 +2392,10 @@ def main() -> None:
                             ball.vel_y = 0
                             # Обновляем отслеживание позиции
                             old_ball_rect = ball.rect.copy()
-                            # Ставим игру на паузу (сохраняем game_started = True для продолжения после паузы)
-                            game_paused = True
-                            # Пропускаем остальную обработку кадра, чтобы сразу перейти в режим паузы
+                            # После потери жизни - ожидание запуска игры (не пауза)
+                            game_started = False
+                            game_paused = False
+                            # Пропускаем остальную обработку кадра
                             continue
                         else:
                             game_over = True
@@ -2441,13 +2546,14 @@ def main() -> None:
                         if lives_left > 0:
                             # Сохраняем старую позицию перед сбросом
                             old_ball_rect = ball.rect.copy()
-                            # Ставим игру на паузу (сохраняем game_started = True для продолжения после паузы)
+                            # После потери жизни - ожидание запуска игры (не пауза)
                             ball.reset(paddle.rect)
                             ball.vel_y = 0
                             # Обновляем отслеживание позиции
                             old_ball_rect = ball.rect.copy()
-                            game_paused = True
-                            # Пропускаем остальную обработку кадра, чтобы сразу перейти в режим паузы
+                            game_started = False
+                            game_paused = False
+                            # Пропускаем остальную обработку кадра
                             continue
                         elif lives_left <= 0:
                             game_over = True
@@ -2545,10 +2651,11 @@ def main() -> None:
             # 1. Игра запущена, не на паузе и мяч движется (обычная траектория)
             # 2. Или во время паузы показываем сохраненную траекторию падения
             if show_trajectory:
-                if game_started and not game_paused and (ball.vel_x != 0 or ball.vel_y != 0):
+                # Во время игры и на паузе всегда рисуем актуальную траекторию из текущего положения мяча
+                if game_started and (ball.vel_x != 0 or ball.vel_y != 0):
                     draw_ball_trajectory(screen, ball, paddle)
                 elif game_paused and saved_trajectory:
-                    # Показываем сохраненную траекторию падения во время паузы
+                    # (Опционально) Если нужен special-case для паузы после потери жизни — показывать saved_trajectory
                     draw_trajectory_points(screen, saved_trajectory)
             
             # Рисуем мяч в новой позиции
@@ -2565,7 +2672,8 @@ def main() -> None:
             if not game_started and not game_paused:
                 draw_start_hint(screen, big_font)
             
-            if game_paused:
+            # Показываем подсказку о паузе только если это обычная пауза (не после потери жизни)
+            if game_paused and game_started:
                 draw_pause_hint(screen, big_font)
 
             pygame.display.flip()
